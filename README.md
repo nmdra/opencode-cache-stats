@@ -35,3 +35,12 @@ Then restart opencode and run `/cache-hit` inside a session.
 
 - `tui-plugins/cache-hit.tsx` — the TUI plugin
 - `tui.json.example` — registration config example
+
+## Documentation
+
+- [index](docs/index.md) — overview
+- [installation](docs/installation.md) — how to install the plugin
+- [usage](docs/usage.md) — how to use the plugin
+- [how-it-works](docs/how-it-works.md) — how the plugin collects the data
+- [colors](docs/colors.md) — how the plugin colors the rate
+- [troubleshooting](docs/troubleshooting.md) — how to fix common errors

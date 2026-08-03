@@ -1,0 +1,49 @@
+# Use the plugin
+
+This guide has two parts. The first part is a procedure. It opens the dialog. The second part explains how to read the dialog.
+
+## Run the slash command
+
+1. Open a session in opencode.
+2. Run the command `/cache-hit`.
+
+The dialog appears. It shows the cache rate of the current session.
+
+If the dialog shows the message `No active session.`, open a session first. Then run the command again.
+
+## Close the dialog
+
+Press the key `esc`. The dialog closes. The session stays open.
+
+## The sections of the dialog
+
+The dialog has five sections. A footer shows the formula at the bottom.
+
+- **The header.** This section shows the title `Cache hit`. It shows the key `esc` on the right.
+- **The highlight.** This section shows the overall cache rate. It shows the title of the session below that rate.
+- **The models.** This section lists the models of the session.
+- **The totals.** This section shows the total token counts. It shows the total cost.
+- **The subagents.** This section lists the subagents of the session.
+- **The footer.** This shows the formula for the cache rate.
+
+## The overall rate
+
+The overall rate is the first value. The plugin computes it from all messages. It includes the messages of the subagents.
+
+A high rate means that many tokens come from the cache. A low rate means that many tokens do not come from the cache.
+
+## The models section
+
+The models section shows one line per model. Each line shows the model name, the hit rate of the model, and the message count of the model.
+
+The dialog sorts the models by message count. The model with the most messages is first.
+
+## The totals section
+
+The totals section shows the sum of all messages. It shows the input tokens, the reasoning tokens, the cache read, and the cache write. It shows the output tokens and the cost.
+
+## The subagents section
+
+The subagents section shows one line per subagent. Each line shows the subagent id, its cache rate, and its message count.
+
+The dialog shows the first eight subagents. It does not show the rest.
