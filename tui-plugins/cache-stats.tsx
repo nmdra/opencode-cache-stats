@@ -353,7 +353,7 @@ function CacheStatsView(props: {
   for (const model of props.models) maxKey = Math.max(maxKey, short(model.key).length)
   const cell = Math.min(Math.max(maxKey, 18), 22)
 
-  const panelW = 56
+  const panelW = 58
   const barW = 10
 
   let scroll: any
