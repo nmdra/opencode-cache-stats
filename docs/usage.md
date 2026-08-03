@@ -28,7 +28,7 @@ The dialog has five sections. A footer shows the formula at the bottom.
 
 ## The overall rate
 
-The overall rate is the first value. The plugin computes it from all messages. It includes the messages of the subagents. A verdict word follows the rate: `Good`, `Fair`, or `Poor`.
+The overall rate is the first value. The plugin computes it from all messages. It includes the messages of the subagents. A verdict word follows the rate: `Excellent`, `Good`, `Fair`, or `Poor`.
 
 A high rate means that many tokens come from the cache. A low rate means that many tokens do not come from the cache.
 

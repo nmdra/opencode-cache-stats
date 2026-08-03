@@ -43,6 +43,7 @@ function safe(n: unknown): number {
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : 0
 }
 
+const HIT_EXCELLENT = 90
 const HIT_GOOD = 70
 const HIT_FAIR = 40
 
@@ -58,16 +59,18 @@ function hitText(t: Acc): string {
 
 function hitColor(theme: Theme, h: number): RGBA {
   if (h < 0) return theme.textMuted
-  if (h >= HIT_GOOD) return theme.success
-  if (h >= HIT_FAIR) return theme.info
-  return theme.warning
+  if (h >= HIT_EXCELLENT) return theme.success
+  if (h >= HIT_GOOD) return theme.info
+  if (h >= HIT_FAIR) return theme.warning
+  return theme.error
 }
 
 function hitVerdict(theme: Theme, h: number): { word: string; color: RGBA } {
   if (h < 0) return { word: "—", color: theme.textMuted }
-  if (h >= HIT_GOOD) return { word: "Good", color: theme.success }
-  if (h >= HIT_FAIR) return { word: "Fair", color: theme.info }
-  return { word: "Poor", color: theme.warning }
+  if (h >= HIT_EXCELLENT) return { word: "Excellent", color: theme.success }
+  if (h >= HIT_GOOD) return { word: "Good", color: theme.info }
+  if (h >= HIT_FAIR) return { word: "Fair", color: theme.warning }
+  return { word: "Poor", color: theme.error }
 }
 
 function hitSegments(theme: Theme, h: number, width: number): { color: RGBA; filled: string; empty: string } {
@@ -81,8 +84,14 @@ function HitBar(props: { theme: Theme; pct: number; width: number }) {
   const b = hitSegments(props.theme, props.pct, props.width)
   return (
     <>
-      <b fg={b.color}>{b.filled}</b>
-      {b.empty.length > 0 ? <b fg={props.theme.borderSubtle}>{b.empty}</b> : null}
+      <b>
+        <span style={{ fg: b.color }}>{b.filled}</span>
+      </b>
+      {b.empty.length > 0 ? (
+        <b>
+          <span style={{ fg: props.theme.borderSubtle }}>{b.empty}</span>
+        </b>
+      ) : null}
     </>
   )
 }
@@ -381,7 +390,7 @@ function CacheStatsView(props: {
         {s.calls === 0 ? (
           <box flexDirection="column" width="100%" gap={0} paddingTop={2} paddingBottom={2}>
             <text fg={theme.textMuted} wrapMode="none">
-              No cache stats data for <b fg={theme.text}>{truncate(props.title, 40)}</b> yet.
+              No cache stats data for <b><span style={{ fg: theme.text }}>{truncate(props.title, 40)}</span></b> yet.
             </text>
             <text fg={theme.textMuted} wrapMode="none">
               Run a few turns in the session, then open again.
@@ -390,7 +399,7 @@ function CacheStatsView(props: {
         ) : (
           <box flexDirection="column" width="100%" gap={0}>
             <text fg={theme.textMuted} wrapMode="none">
-              <b fg={headColor}>{hitText(s)}</b> <b fg={verdict.color}>{verdict.word}</b> · overall hit · <b fg={theme.text}>{String(s.calls)}</b> calls
+              <b><span style={{ fg: headColor }}>{hitText(s)}</span></b> <b><span style={{ fg: verdict.color }}>{verdict.word}</span></b> · overall hit · <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls
             </text>
             <text fg={theme.textMuted} wrapMode="none">
               {truncate(props.title, 60)}
@@ -401,7 +410,7 @@ function CacheStatsView(props: {
             <box flexDirection="row" gap={1}>
               <text fg={theme.accent}>│</text>
               <text fg={theme.secondary}>
-                <b>Models</b> <b fg={theme.textMuted}>· {String(props.models.length)}</b>
+                <b>Models</b> <b><span style={{ fg: theme.textMuted }}>· {String(props.models.length)}</span></b>
               </text>
             </box>
             <box flexDirection="column" gap={0} paddingLeft={2}>
@@ -412,11 +421,13 @@ function CacheStatsView(props: {
                 const name = truncate(short(model.key), cell)
                 return (
                   <text fg={theme.textMuted} wrapMode="none">
-                    {padEnd(name, cell)}  <b fg={mc}>{padStart(hitText(m), 6)}</b>  <HitBar theme={theme} pct={mh} width={barW} />
+                    {padEnd(name, cell)}  <b><span style={{ fg: mc }}>{padStart(hitText(m), 6)}</span></b>  <HitBar theme={theme} pct={mh} width={barW} />
                     {m.calls > 0 ? (
-                      <b fg={m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted}>
-                        {"  "}
-                        {String(m.callsWithCacheRead)}/{String(m.calls)}
+                      <b>
+                        <span style={{ fg: m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted }}>
+                          {"  "}
+                          {String(m.callsWithCacheRead)}/{String(m.calls)}
+                        </span>
                       </b>
                     ) : null}
                   </text>
@@ -429,24 +440,24 @@ function CacheStatsView(props: {
             <box flexDirection="row" gap={1}>
               <text fg={theme.accent}>│</text>
               <text fg={theme.secondary}>
-                <b>Totals</b> <b fg={theme.textMuted}>· main + {String(props.subagents)} {subWord}</b>
+                <b>Totals</b> <b><span style={{ fg: theme.textMuted }}>· main + {String(props.subagents)} {subWord}</span></b>
               </text>
             </box>
             <box flexDirection="column" gap={0} paddingLeft={2}>
               <text fg={theme.textMuted} wrapMode="none">
-                fresh input <b fg={theme.syntaxNumber}>{fmt(s.input)}</b> · output <b fg={theme.syntaxNumber}>{fmt(s.output)}</b> · reasoning <b fg={theme.syntaxNumber}>{fmt(s.reasoning)}</b>
+                fresh input <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.input)}</span></b> · output <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.output)}</span></b> · reasoning <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.reasoning)}</span></b>
               </text>
               <text fg={theme.textMuted} wrapMode="none">
-                cache read <b fg={theme.info}>{fmt(s.cacheRead)}</b> · cache write <b fg={theme.warning}>{fmt(s.cacheWrite)}</b> · cost <b fg={theme.text}>{fmtCost(s.cost)}</b>
+                cache read <b><span style={{ fg: theme.info }}>{fmt(s.cacheRead)}</span></b> · cache write <b><span style={{ fg: theme.warning }}>{fmt(s.cacheWrite)}</span></b> · cost <b><span style={{ fg: theme.text }}>{fmtCost(s.cost)}</span></b>
               </text>
               {s.calls > 0 ? (
                 <text fg={theme.textMuted} wrapMode="none">
-                  <b fg={s.callsWithCacheRead === s.calls ? theme.success : theme.text}>{String(s.callsWithCacheRead)}</b> of <b fg={theme.text}>{String(s.calls)}</b> calls read from cache
+                  <b><span style={{ fg: s.callsWithCacheRead === s.calls ? theme.success : theme.text }}>{String(s.callsWithCacheRead)}</span></b> of <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls read from cache
                 </text>
               ) : null}
               {s.lastInput + s.lastCacheRead > 0 ? (
                 <text fg={theme.textMuted} wrapMode="none">
-                  <b fg={theme.accent}>most recent request</b> · <b fg={theme.text}>{fmt(s.lastInput + s.lastCacheRead)}</b> tokens · <b fg={theme.info}>{fmt(s.lastCacheRead)}</b> cache
+                  <b><span style={{ fg: theme.accent }}>most recent request</span></b> · <b><span style={{ fg: theme.text }}>{fmt(s.lastInput + s.lastCacheRead)}</span></b> tokens · <b><span style={{ fg: theme.info }}>{fmt(s.lastCacheRead)}</span></b> cache
                 </text>
               ) : null}
             </box>
@@ -460,7 +471,7 @@ function CacheStatsView(props: {
                 <box flexDirection="row" gap={1}>
                   <text fg={theme.accent}>│</text>
                   <text fg={theme.secondary}>
-                    <b>Subagents</b> <b fg={theme.textMuted}>· {String(props.subs.length)}</b>
+                    <b>Subagents</b> <b><span style={{ fg: theme.textMuted }}>· {String(props.subs.length)}</span></b>
                   </text>
                 </box>
                 <box flexDirection="column" gap={0} paddingLeft={2}>
@@ -470,13 +481,13 @@ function CacheStatsView(props: {
                       <text fg={theme.textMuted} wrapMode="none">
                         {sub.name !== sub.id ? (
                           <>
-                            <b fg={theme.text}>{truncate(sub.name, 18)}</b>{" "}
-                            <b fg={theme.textMuted}>{truncate(sub.id, 8)}</b>
+                            <b><span style={{ fg: theme.text }}>{truncate(sub.name, 18)}</span></b>{" "}
+                            <b><span style={{ fg: theme.textMuted }}>{truncate(sub.id, 8)}</span></b>
                           </>
                         ) : (
                           truncate(sub.id, 20)
                         )}{" "}
-                        · <b fg={hitColor(theme, sh)}>{sub.hit}</b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
+                        · <b><span style={{ fg: hitColor(theme, sh) }}>{sub.hit}</span></b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
                         {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit` : ""}
                       </text>
                     )
@@ -492,7 +503,7 @@ function CacheStatsView(props: {
         hit = cache read / (input + cache read)
       </text>
       <text fg={theme.borderSubtle} wrapMode="none">
-        <b fg={theme.success}>≥{HIT_GOOD}%</b> <b fg={theme.textMuted}>·</b> <b fg={theme.info}>{HIT_FAIR}–{HIT_GOOD - 1}%</b> <b fg={theme.textMuted}>·</b> <b fg={theme.warning}>&lt;{HIT_FAIR}%</b> <b fg={theme.textMuted}>hit levels</b>
+        <b><span style={{ fg: theme.success }}>● ≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>● {HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>● {HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>● &lt;{HIT_FAIR}%</span></b>
       </text>
     </box>
   )

@@ -4,9 +4,10 @@ The plugin uses the colors from the opencode theme. It maps the cache rate to a 
 
 ## The color levels
 
-- 70% or more: the success color
-- 40% to 69%: the info color
-- below 40%: the warning color
+- 90% or more: the success color
+- 70% to 89%: the info color
+- 40% to 69%: the warning color
+- below 40%: the error color
 - no rate: the muted color
 
 The plugin shows `n/a` in the muted color when there is no rate. This can happen for a session with no tokens.
@@ -15,7 +16,8 @@ The plugin shows `n/a` in the muted color when there is no rate. This can happen
 
 The plugin shows a word next to the rate. The word uses the same colors:
 
-- `Good` for 70% or more
+- `Excellent` for 90% or more
+- `Good` for 70% to 89%
 - `Fair` for 40% to 69%
 - `Poor` for below 40%
 - `—` for no rate
@@ -32,7 +34,7 @@ The overall rate uses these colors. Each model rate uses these colors. Each suba
 
 The other values have their own theme colors. The cache read number uses the info color. The cache write number uses the warning color. The token counts and the cost have their own colors.
 
-The footer repeats the color levels: `≥70%` in the success color, `40–69%` in the info color, and `<40%` in the warning color.
+The footer repeats the color levels with a dot for each level: `● ≥90%` in the success color, `● 70–89%` in the info color, `● 40–69%` in the warning color, and `● <40%` in the error color.
 
 ## The theme
 

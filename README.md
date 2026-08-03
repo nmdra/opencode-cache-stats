@@ -6,7 +6,7 @@ Open it with the `/cache-stats` command (or the `cache-stats.show` command) whil
 
 ## What it shows
 
-- Overall cache hit % for the active session with a color-coded verdict (`Good` / `Fair` / `Poor`)
+- Overall cache hit % for the active session with a color-coded verdict (`Excellent` / `Good` / `Fair` / `Poor`)
 - Per-model breakdown with hit bars, hit %, and cached-call counts
 - Totals across the main session including its subagents
 - Subagent list with individual hit rates
