@@ -17,14 +17,14 @@ Press the key `esc`. The dialog closes. The session stays open.
 
 ## The sections of the dialog
 
-The dialog has five sections. A footer shows the formula at the bottom.
+The dialog has five sections. A footer shows the formula and the color levels at the bottom.
 
 - **The header.** This section shows the title `Cache stats`. It shows the key `esc` on the right.
 - **The highlight.** This section shows the overall cache rate. It shows the title of the session below that rate.
 - **The models.** This section lists the models of the session.
 - **The totals.** This section shows the total token counts. It shows the total cost.
 - **The subagents.** This section lists the subagents of the session.
-- **The footer.** This shows the formula for the cache rate.
+- **The footer.** This shows the formula for the cache rate. It also shows the color levels with a dot for each level.
 
 ## The overall rate
 
@@ -44,7 +44,7 @@ The totals section shows the sum of all messages. It shows the fresh input, the 
 
 The totals add the values of every call in the session. The values grow as the session grows. A cache read total can be much larger than the context window. This is correct. Every call re-reads the same cached prefix. The values are not a snapshot of the current context.
 
-The section has a `most recent request` line for comparison. It shows the token count of the most recent call. This value is close to the context size in the TUI.
+The section has a `most recent request` line for comparison. It shows the token count of the most recent call in the main session. This value is close to the context size in the TUI. The line does not include the calls of the subagents.
 
 ## The subagents section
 

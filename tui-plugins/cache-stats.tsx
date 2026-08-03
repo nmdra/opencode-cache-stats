@@ -24,7 +24,7 @@ type Acc = {
   lastCacheWrite: number
 }
 
-type Sub = { id: string; name: string; hit: string; msgs: number; calls: number; callsWithCacheRead: number }
+type Sub = { id: string; name: string; hit: number; msgs: number; calls: number; callsWithCacheRead: number }
 
 type Collected = {
   acc: Acc
@@ -52,9 +52,12 @@ function hitPct(t: Acc): number {
   return denom <= 0 ? -1 : (100 * t.cacheRead) / denom
 }
 
-function hitText(t: Acc): string {
-  const h = hitPct(t)
+function fmtHit(h: number): string {
   return h < 0 ? "n/a" : `${h.toFixed(1)}%`
+}
+
+function hitText(t: Acc): string {
+  return fmtHit(hitPct(t))
 }
 
 function hitColor(theme: Theme, h: number): RGBA {
@@ -270,11 +273,13 @@ async function collect(
   let messages: Msg[] = []
   try {
     const res: any = await client.session.messages({ sessionID })
-    messages = (res?.data ?? res ?? []) as Msg[]
+    const data = res?.data ?? res
+    messages = Array.isArray(data) ? (data as Msg[]) : []
   } catch {}
   if (messages.length === 0) {
     try {
-      messages = (state.session.messages(sessionID) ?? []) as Msg[]
+      const data = state.session.messages(sessionID)
+      messages = Array.isArray(data) ? (data as Msg[]) : []
     } catch {}
   }
 
@@ -299,8 +304,15 @@ async function collect(
   const subs: Sub[] = []
   try {
     const res: any = await client.session.children({ sessionID })
-    children = res?.data ?? res ?? []
+    const data = res?.data ?? res
+    children = Array.isArray(data) ? data : []
   } catch {}
+  if (children.length === 0) {
+    try {
+      const data = (state.session as any).children?.(sessionID)
+      children = Array.isArray(data) ? data : []
+    } catch {}
+  }
 
   for (const child of children) {
     const cid = child?.id ?? ""
@@ -310,7 +322,7 @@ async function collect(
     subs.push({
       id: cid,
       name: agentName(child) || cid,
-      hit: hitText(sub.acc),
+      hit: hitPct(sub.acc),
       msgs: sub.acc.count,
       calls: sub.acc.calls,
       callsWithCacheRead: sub.acc.callsWithCacheRead,
@@ -421,7 +433,7 @@ function CacheStatsView(props: {
                 const name = truncate(short(model.key), cell)
                 return (
                   <text fg={theme.textMuted} wrapMode="none">
-                    {padEnd(name, cell)}  <b><span style={{ fg: mc }}>{padStart(hitText(m), 6)}</span></b>  <HitBar theme={theme} pct={mh} width={barW} />
+                    {padEnd(name, cell)}  <b><span style={{ fg: mc }}>{padStart(fmtHit(mh), 6)}</span></b>  <HitBar theme={theme} pct={mh} width={barW} />
                     {m.calls > 0 ? (
                       <b>
                         <span style={{ fg: m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted }}>
@@ -476,7 +488,6 @@ function CacheStatsView(props: {
                 </box>
                 <box flexDirection="column" gap={0} paddingLeft={2}>
                   {props.subs.map((sub) => {
-                    const sh = parseFloat(sub.hit)
                     return (
                       <text fg={theme.textMuted} wrapMode="none">
                         {sub.name !== sub.id ? (
@@ -487,7 +498,7 @@ function CacheStatsView(props: {
                         ) : (
                           truncate(sub.id, 20)
                         )}{" "}
-                        · <b><span style={{ fg: hitColor(theme, sh) }}>{sub.hit}</span></b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
+                        · <b><span style={{ fg: hitColor(theme, sub.hit) }}>{fmtHit(sub.hit)}</span></b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
                         {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit` : ""}
                       </text>
                     )

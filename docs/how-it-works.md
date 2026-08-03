@@ -41,6 +41,8 @@ hit = cache read / (input + cache read)
 
 The rate is a percentage. The plugin shows `n/a` when the sum of the values is zero. A session with no tokens gives no rate.
 
+The plugin maps the rate to a verdict word and a color. The mapping has four levels. The levels are `Excellent`, `Good`, `Fair`, and `Poor`. The mapping is in `docs/colors.md`.
+
 The plugin excludes cache write from the rate. A cache write is a one-time priming cost. It is not part of the input that the provider serves again.
 
 ## The model list
