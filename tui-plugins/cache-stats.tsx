@@ -395,6 +395,7 @@ function CacheStatsView(props: {
         height={14}
         scrollY
         scrollbarOptions={{ trackOptions: { backgroundColor: theme.borderSubtle } }}
+        viewportOptions={{ paddingRight: 2 }}
         ref={(r) => {
           scroll = r
         }}
