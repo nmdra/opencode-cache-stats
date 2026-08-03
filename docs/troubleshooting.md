@@ -4,7 +4,7 @@ Read the error first. Then read the fix. The fixes are one instruction per step.
 
 ## The command does nothing
 
-The slash command `/cache-hit` does nothing when you are not in a session.
+The slash command `/cache-stats` does nothing when you are not in a session.
 
 Open a session first. Then run the command again.
 
@@ -12,7 +12,7 @@ Open a session first. Then run the command again.
 
 The plugin cannot find a session. This message appears when the command runs outside a session.
 
-Open a session. Then run `/cache-hit` again.
+Open a session. Then run `/cache-stats` again.
 
 Make sure that you are on the session page. A session page has the session id in the route.
 
@@ -20,15 +20,15 @@ Make sure that you are on the session page. A session page has the session id in
 
 The plugin loads at opencode startup. If the plugin was not installed before the start, it does not load.
 
-Restart opencode. Then run `/cache-hit` again.
+Restart opencode. Then run `/cache-stats` again.
 
-Make sure that the path in `tui.json` is correct. The path must point to `cache-hit.tsx`.
+Make sure that the path in `tui.json` is correct. The path must point to `cache-stats.tsx`.
 
 ## The dialog shows `n/a`
 
 The plugin shows `n/a` when the rate has no value. This happens when the sum of the token values is zero.
 
-Do a session with an AI model. Then run `/cache-hit` again. A session before the first reply gives no rate.
+Do a session with an AI model. Then run `/cache-stats` again. A session before the first reply gives no rate.
 
 ## The dialog shows wrong numbers
 

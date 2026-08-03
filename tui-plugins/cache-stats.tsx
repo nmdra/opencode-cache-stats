@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
+import { useKeyboard } from "@opentui/solid"
 import type { TuiPlugin, TuiPluginModule, TuiPluginApi } from "@opencode-ai/plugin/tui"
 
 type Theme = TuiPluginApi["theme"]["current"]
@@ -24,7 +24,7 @@ type Acc = {
   lastCacheWrite: number
 }
 
-type Sub = { id: string; hit: string; msgs: number; calls: number; callsWithCacheRead: number }
+type Sub = { id: string; name: string; hit: string; msgs: number; calls: number; callsWithCacheRead: number }
 
 type Collected = {
   acc: Acc
@@ -43,6 +43,9 @@ function safe(n: unknown): number {
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : 0
 }
 
+const HIT_GOOD = 70
+const HIT_FAIR = 40
+
 function hitPct(t: Acc): number {
   const denom = t.input + t.cacheRead
   return denom <= 0 ? -1 : (100 * t.cacheRead) / denom
@@ -53,12 +56,35 @@ function hitText(t: Acc): string {
   return h < 0 ? "n/a" : `${h.toFixed(1)}%`
 }
 
-function hitColor(theme: Theme, t: Acc): RGBA {
-  const h = hitPct(t)
+function hitColor(theme: Theme, h: number): RGBA {
   if (h < 0) return theme.textMuted
-  if (h >= 70) return theme.success
-  if (h >= 40) return theme.info
+  if (h >= HIT_GOOD) return theme.success
+  if (h >= HIT_FAIR) return theme.info
   return theme.warning
+}
+
+function hitVerdict(theme: Theme, h: number): { word: string; color: RGBA } {
+  if (h < 0) return { word: "—", color: theme.textMuted }
+  if (h >= HIT_GOOD) return { word: "Good", color: theme.success }
+  if (h >= HIT_FAIR) return { word: "Fair", color: theme.info }
+  return { word: "Poor", color: theme.warning }
+}
+
+function hitSegments(theme: Theme, h: number, width: number): { color: RGBA; filled: string; empty: string } {
+  const w = Math.max(4, width)
+  if (h < 0) return { color: theme.textMuted, filled: "·".repeat(w), empty: "" }
+  const filled = Math.round((h / 100) * w)
+  return { color: hitColor(theme, h), filled: "█".repeat(filled), empty: "░".repeat(Math.max(0, w - filled)) }
+}
+
+function HitBar(props: { theme: Theme; pct: number; width: number }) {
+  const b = hitSegments(props.theme, props.pct, props.width)
+  return (
+    <>
+      <b fg={b.color}>{b.filled}</b>
+      {b.empty.length > 0 ? <b fg={props.theme.borderSubtle}>{b.empty}</b> : null}
+    </>
+  )
 }
 
 function newAcc(): Acc {
@@ -91,6 +117,11 @@ function padEnd(s: string, n: number): string {
 
 function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s
+}
+
+function short(s: string): string {
+  const i = s.indexOf("/")
+  return i >= 0 ? s.slice(i + 1) : s
 }
 
 type Tokens = { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } }
@@ -201,6 +232,19 @@ function modelKey(m: Msg): string {
   return `${p}/${q}`
 }
 
+function agentName(child: any): string {
+  const raw = child?.agent ?? child?.agentType
+  if (typeof raw === "string" && raw.trim()) return raw.trim()
+  const title = child?.title
+  if (typeof title === "string") {
+    const m = title.match(/\(@([^)\s]+)\s+subagent\)/)
+    if (m) return m[1]
+    const word = title.split(/\s+/)[0]
+    if (word) return word
+  }
+  return ""
+}
+
 function fmtCost(n: number): string {
   return n === 0 ? "$0" : `$${n.toFixed(2)}`
 }
@@ -254,7 +298,14 @@ async function collect(
     if (!cid) continue
     const sub = await collect(client, state, cid, visited)
     subagents += 1 + sub.subagents
-    subs.push({ id: cid, hit: hitText(sub.acc), msgs: sub.acc.count, calls: sub.acc.calls, callsWithCacheRead: sub.acc.callsWithCacheRead })
+    subs.push({
+      id: cid,
+      name: agentName(child) || cid,
+      hit: hitText(sub.acc),
+      msgs: sub.acc.count,
+      calls: sub.acc.calls,
+      callsWithCacheRead: sub.acc.callsWithCacheRead,
+    })
     mergeAcc(acc, sub.acc)
     mergeModel(perModel, sub.perModel)
     subs.push(...sub.subs)
@@ -263,7 +314,7 @@ async function collect(
   return { acc, subagents, perModel, subs }
 }
 
-function CacheHitView(props: {
+function CacheStatsView(props: {
   theme: Theme
   title: string
   acc: Acc
@@ -274,13 +325,15 @@ function CacheHitView(props: {
   const theme = props.theme
   const s = props.acc
   const h = hitPct(s)
-  const headColor = hitColor(theme, s)
+  const headColor = hitColor(theme, h)
+  const verdict = hitVerdict(theme, h)
   const subWord = props.subagents === 1 ? "subagent" : "subagents"
   let maxKey = 0
-  for (const model of props.models) maxKey = Math.max(maxKey, model.key.length)
-  const cell = Math.min(Math.max(maxKey, 18), 32)
+  for (const model of props.models) maxKey = Math.max(maxKey, short(model.key).length)
+  const cell = Math.min(Math.max(maxKey, 18), 22)
 
-  const dimensions = useTerminalDimensions()
+  const panelW = 56
+  const barW = 10
 
   let scroll: any
   useKeyboard((evt) => {
@@ -306,123 +359,150 @@ function CacheHitView(props: {
   })
 
   return (
-    <box flexDirection="column" width="100%" paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={0}>
+    <box flexDirection="column" width={panelW} paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={0}>
       <box flexDirection="row" width="100%" justifyContent="space-between">
         <text fg={theme.primary}>
-          <b>Cache hit</b>
+          <b>Cache stats</b>
         </text>
-        <text fg={theme.textMuted}>esc</text>
+        <text fg={theme.textMuted}>{props.models.length + props.subs.length > 12 ? "↑/↓ · esc" : "esc"}</text>
       </box>
       <text fg={theme.borderSubtle} wrapMode="none">
         ───────────────────────────────
       </text>
 
       <scrollbox
-        height={Math.min(36, Math.max(8, Math.floor(dimensions().height * 0.5)))}
+        height={14}
         scrollY
         scrollbarOptions={{ trackOptions: { backgroundColor: theme.borderSubtle } }}
         ref={(r) => {
           scroll = r
         }}
       >
-        <box flexDirection="column" width="100%" gap={0}>
-          <text fg={headColor} wrapMode="none">
-            <b>{hitText(s)}</b> overall hit
-          </text>
-          <text fg={theme.textMuted} wrapMode="none">
-            {truncate(props.title, 60)}
-          </text>
-
-          <box height={1} />
-
-          <text fg={theme.text} wrapMode="none">
-            <b>Models</b> <b fg={theme.textMuted}>· {String(props.models.length)}</b>
-          </text>
-          <box flexDirection="column" gap={0} paddingLeft={1}>
-            {props.models.map((model) => {
-              const m = model.acc
-              const mc = hitColor(theme, m)
-              const name = truncate(model.key, cell)
-              return (
-                <text fg={theme.textMuted} wrapMode="none">
-                  {padEnd(name, cell)} <b fg={mc}>{padStart(hitText(m), 6)}</b>
-                  {m.calls > 0 ? (
-                    <b fg={m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted}>
-                      {"  "}
-                      {String(m.callsWithCacheRead)}/{String(m.calls)} calls hit
-                    </b>
-                  ) : null}
-                </text>
-              )
-            })}
-          </box>
-
-          <box height={1} />
-
-          <text fg={theme.text} wrapMode="none">
-            <b>Totals</b> <b fg={theme.textMuted}>· main + {String(props.subagents)} {subWord}</b>
-          </text>
-          <box flexDirection="column" gap={0} paddingLeft={1}>
+        {s.calls === 0 ? (
+          <box flexDirection="column" width="100%" gap={0} paddingTop={2} paddingBottom={2}>
             <text fg={theme.textMuted} wrapMode="none">
-              input <b fg={theme.syntaxNumber}>{fmt(s.input)}</b> · output <b fg={theme.syntaxNumber}>{fmt(s.output)}</b> · reasoning <b fg={theme.syntaxNumber}>{fmt(s.reasoning)}</b>
+              No cache stats data for <b fg={theme.text}>{truncate(props.title, 40)}</b> yet.
             </text>
             <text fg={theme.textMuted} wrapMode="none">
-              cache read <b fg={theme.info}>{fmt(s.cacheRead)}</b> · cache write <b fg={theme.warning}>{fmt(s.cacheWrite)}</b> · cost <b fg={theme.text}>{fmtCost(s.cost)}</b>
+              Run a few turns in the session, then open again.
             </text>
-            {s.calls > 0 ? (
-              <text fg={theme.textMuted} wrapMode="none">
-                <b fg={s.callsWithCacheRead === s.calls ? theme.success : theme.text}>{String(s.callsWithCacheRead)}</b> of <b fg={theme.text}>{String(s.calls)}</b> calls read from cache
-              </text>
-            ) : null}
-            {s.lastInput + s.lastCacheRead > 0 ? (
-              <text fg={theme.textMuted} wrapMode="none">
-                latest request · <b fg={theme.text}>{fmt(s.lastInput + s.lastCacheRead)}</b> tokens in · cache read <b fg={theme.info}>{fmt(s.lastCacheRead)}</b>
-              </text>
-            ) : null}
           </box>
-          <text fg={theme.textMuted} wrapMode="none">
-            totals are cumulative over all calls
-          </text>
+        ) : (
+          <box flexDirection="column" width="100%" gap={0}>
+            <text fg={theme.textMuted} wrapMode="none">
+              <b fg={headColor}>{hitText(s)}</b> <b fg={verdict.color}>{verdict.word}</b> · overall hit · <b fg={theme.text}>{String(s.calls)}</b> calls
+            </text>
+            <text fg={theme.textMuted} wrapMode="none">
+              {truncate(props.title, 60)}
+            </text>
 
-          {props.subs.length > 0 ? (
-            <>
-              <box height={1} />
-              <text fg={theme.text} wrapMode="none">
-                <b>Subagents</b> <b fg={theme.textMuted}>· {String(props.subs.length)}</b>
+            <box height={1} />
+
+            <box flexDirection="row" gap={1}>
+              <text fg={theme.accent}>│</text>
+              <text fg={theme.secondary}>
+                <b>Models</b> <b fg={theme.textMuted}>· {String(props.models.length)}</b>
               </text>
-              <box flexDirection="column" gap={0} paddingLeft={1}>
-                {props.subs.map((sub) => (
+            </box>
+            <box flexDirection="column" gap={0} paddingLeft={2}>
+              {props.models.map((model) => {
+                const m = model.acc
+                const mh = hitPct(m)
+                const mc = hitColor(theme, mh)
+                const name = truncate(short(model.key), cell)
+                return (
                   <text fg={theme.textMuted} wrapMode="none">
-                    {truncate(sub.id, 20)} · <b fg={hitColorSub(theme, sub.hit)}>{sub.hit}</b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
-                    {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} calls hit` : ""}
+                    {padEnd(name, cell)}  <b fg={mc}>{padStart(hitText(m), 6)}</b>  <HitBar theme={theme} pct={mh} width={barW} />
+                    {m.calls > 0 ? (
+                      <b fg={m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted}>
+                        {"  "}
+                        {String(m.callsWithCacheRead)}/{String(m.calls)}
+                      </b>
+                    ) : null}
                   </text>
-                ))}
-              </box>
-            </>
-          ) : null}
-        </box>
+                )
+              })}
+            </box>
+
+            <box height={1} />
+
+            <box flexDirection="row" gap={1}>
+              <text fg={theme.accent}>│</text>
+              <text fg={theme.secondary}>
+                <b>Totals</b> <b fg={theme.textMuted}>· main + {String(props.subagents)} {subWord}</b>
+              </text>
+            </box>
+            <box flexDirection="column" gap={0} paddingLeft={2}>
+              <text fg={theme.textMuted} wrapMode="none">
+                fresh input <b fg={theme.syntaxNumber}>{fmt(s.input)}</b> · output <b fg={theme.syntaxNumber}>{fmt(s.output)}</b> · reasoning <b fg={theme.syntaxNumber}>{fmt(s.reasoning)}</b>
+              </text>
+              <text fg={theme.textMuted} wrapMode="none">
+                cache read <b fg={theme.info}>{fmt(s.cacheRead)}</b> · cache write <b fg={theme.warning}>{fmt(s.cacheWrite)}</b> · cost <b fg={theme.text}>{fmtCost(s.cost)}</b>
+              </text>
+              {s.calls > 0 ? (
+                <text fg={theme.textMuted} wrapMode="none">
+                  <b fg={s.callsWithCacheRead === s.calls ? theme.success : theme.text}>{String(s.callsWithCacheRead)}</b> of <b fg={theme.text}>{String(s.calls)}</b> calls read from cache
+                </text>
+              ) : null}
+              {s.lastInput + s.lastCacheRead > 0 ? (
+                <text fg={theme.textMuted} wrapMode="none">
+                  <b fg={theme.accent}>most recent request</b> · <b fg={theme.text}>{fmt(s.lastInput + s.lastCacheRead)}</b> tokens · <b fg={theme.info}>{fmt(s.lastCacheRead)}</b> cache
+                </text>
+              ) : null}
+            </box>
+            <text fg={theme.textMuted} wrapMode="none">
+              totals are cumulative over all calls
+            </text>
+
+            {props.subs.length > 0 ? (
+              <>
+                <box height={1} />
+                <box flexDirection="row" gap={1}>
+                  <text fg={theme.accent}>│</text>
+                  <text fg={theme.secondary}>
+                    <b>Subagents</b> <b fg={theme.textMuted}>· {String(props.subs.length)}</b>
+                  </text>
+                </box>
+                <box flexDirection="column" gap={0} paddingLeft={2}>
+                  {props.subs.map((sub) => {
+                    const sh = parseFloat(sub.hit)
+                    return (
+                      <text fg={theme.textMuted} wrapMode="none">
+                        {sub.name !== sub.id ? (
+                          <>
+                            <b fg={theme.text}>{truncate(sub.name, 18)}</b>{" "}
+                            <b fg={theme.textMuted}>{truncate(sub.id, 8)}</b>
+                          </>
+                        ) : (
+                          truncate(sub.id, 20)
+                        )}{" "}
+                        · <b fg={hitColor(theme, sh)}>{sub.hit}</b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
+                        {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit` : ""}
+                      </text>
+                    )
+                  })}
+                </box>
+              </>
+            ) : null}
+          </box>
+        )}
       </scrollbox>
 
       <text fg={theme.borderSubtle} wrapMode="none">
         hit = cache read / (input + cache read)
       </text>
+      <text fg={theme.borderSubtle} wrapMode="none">
+        <b fg={theme.success}>≥{HIT_GOOD}%</b> <b fg={theme.textMuted}>·</b> <b fg={theme.info}>{HIT_FAIR}–{HIT_GOOD - 1}%</b> <b fg={theme.textMuted}>·</b> <b fg={theme.warning}>&lt;{HIT_FAIR}%</b> <b fg={theme.textMuted}>hit levels</b>
+      </text>
     </box>
   )
-}
-
-function hitColorSub(theme: Theme, hit: string): RGBA {
-  const n = parseFloat(hit)
-  if (Number.isNaN(n)) return theme.textMuted
-  if (n >= 70) return theme.success
-  if (n >= 40) return theme.info
-  return theme.warning
 }
 
 async function showCache(api: TuiPluginApi): Promise<void> {
   const route = api.route?.current
   const sessionID = route?.name === "session" ? route.params?.sessionID : undefined
   if (!sessionID) {
-    api.ui.toast({ title: "Cache hit", message: "No active session.", variant: "warning" })
+    api.ui.toast({ title: "Cache stats", message: "No active session.", variant: "warning" })
     return
   }
 
@@ -438,7 +518,7 @@ async function showCache(api: TuiPluginApi): Promise<void> {
 
   api.ui.dialog.setSize("medium")
   api.ui.dialog.replace(() => (
-    <CacheHitView
+    <CacheStatsView
       theme={api.theme.current}
       title={title}
       acc={acc}
@@ -453,11 +533,11 @@ export const tui: TuiPlugin = async (api) => {
   api.keymap.registerLayer({
     commands: [
       {
-        name: "cache-hit.show",
-        title: "Cache hit",
+        name: "cache-stats.show",
+        title: "Cache stats",
         category: "System",
         namespace: "palette",
-        slashName: "cache-hit",
+        slashName: "cache-stats",
         run: () => {
           void showCache(api)
         },
@@ -466,5 +546,5 @@ export const tui: TuiPlugin = async (api) => {
   })
 }
 
-const plugin: TuiPluginModule = { id: "cache-hit", tui }
+const plugin: TuiPluginModule = { id: "cache-stats", tui }
 export default plugin

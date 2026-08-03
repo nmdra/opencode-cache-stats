@@ -1,15 +1,16 @@
-# cache-hit
+# cache-stats
 
 Very Simple opencode TUI plugin that shows prompt-cache hit rate in a popup dialog.
 
-Open it with the `/cache-hit` command (or the `cache-hit.show` command) while inside a session.
+Open it with the `/cache-stats` command (or the `cache-stats.show` command) while inside a session.
 
 ## What it shows
 
-- Overall cache hit % for the active session
-- Per-model breakdown (hit %, message count, input tokens)
+- Overall cache hit % for the active session with a color-coded verdict (`Good` / `Fair` / `Poor`)
+- Per-model breakdown with hit bars, hit %, and cached-call counts
 - Totals across the main session including its subagents
 - Subagent list with individual hit rates
+- The most recent request's context size for comparison
 
 Cache hit rate is computed as:
 
@@ -25,17 +26,17 @@ Copy the plugin into your opencode config and register it in `~/.config/opencode
 
 ```json
 {
-  "plugin": ["./tui-plugins/cache-hit.tsx"]
+  "plugin": ["./tui-plugins/cache-stats.tsx"]
 }
 ```
 
 A copy of `tui.json` is kept as `tui.json.example` in this repo.
 
-Then restart opencode and run `/cache-hit` inside a session.
+Then restart opencode and run `/cache-stats` inside a session.
 
 ## Files
 
-- `tui-plugins/cache-hit.tsx` — the TUI plugin
+- `tui-plugins/cache-stats.tsx` — the TUI plugin
 - `tui.json.example` — registration config example
 
 ## Documentation

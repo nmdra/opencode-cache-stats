@@ -24,7 +24,7 @@ The plugin ignores the messages of the user. A user message has no tokens. The s
 
 The plugin reads four values from the assistant messages.
 
-- `input` is the number of input tokens.
+- `input` is the number of input tokens that are not served from the cache. The dialog calls it the fresh input.
 - `cache read` is the number of tokens that came from the cache.
 - `cache write` is the number of tokens written to the cache.
 - `reasoning` is the number of reasoning tokens.
@@ -53,6 +53,6 @@ The plugin tries the read with the API first. If the API returns no messages, th
 
 ## The limits
 
-The dialog shows the first eight subagents. The dialog shortens long model names and long session titles. A shortened name ends with `…`.
+The dialog shortens long model names, long session titles, and long subagent names. A shortened name ends with `…`. It shows all subagents. When there are many, the dialog scrolls.
 
 The plugin does not change the data. It only reads the data. You can run it many times on the same session.

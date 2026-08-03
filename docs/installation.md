@@ -27,10 +27,10 @@ Run the command:
 mkdir -p tui-plugins
 ```
 
-3. Copy the file `cache-hit.tsx` from this repository into `tui-plugins`.
+3. Copy the file `cache-stats.tsx` from this repository into `tui-plugins`.
 
 ```
-cp tui-plugins/cache-hit.tsx ~/.config/opencode/tui-plugins/cache-hit.tsx
+cp tui-plugins/cache-stats.tsx ~/.config/opencode/tui-plugins/cache-stats.tsx
 ```
 
 4. Make sure that the file exists.
@@ -41,7 +41,7 @@ Run the command:
 ls ~/.config/opencode/tui-plugins/
 ```
 
-The file `cache-hit.tsx` appears in the list.
+The file `cache-stats.tsx` appears in the list.
 
 ## 3. Register the plugin
 
@@ -55,13 +55,13 @@ code ~/.config/opencode/tui.json
 
 If the file does not exist, create a new file with this name.
 
-2. Add the path `"./tui-plugins/cache-hit.tsx"` to the list of plugins.
+2. Add the path `"./tui-plugins/cache-stats.tsx"` to the list of plugins.
 
 Use the example file `tui.json.example` in this repository as a starting point. The registration looks like this:
 
 ```json
 {
-  "plugin": ["./tui-plugins/cache-hit.tsx"]
+  "plugin": ["./tui-plugins/cache-stats.tsx"]
 }
 ```
 
@@ -77,6 +77,6 @@ The plugin loads when opencode starts.
 ## 5. Test the plugin
 
 1. Open a session.
-2. Run the command `/cache-hit`.
+2. Run the command `/cache-stats`.
 
 If the dialog appears, the plugin works. If it does not appear, read `docs/troubleshooting.md`.

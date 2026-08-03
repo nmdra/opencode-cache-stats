@@ -1,6 +1,6 @@
-# cache-hit
+# cache-stats
 
-cache-hit is an opencode TUI plugin. It shows the cache rate of a session. It opens a dialog when you run the slash command `/cache-hit`. It does not call an AI model.
+cache-stats is an opencode TUI plugin. It shows the cache rate of a session. It opens a dialog when you run the slash command `/cache-stats`. It does not call an AI model.
 
 You use it to see how much of the prompt input comes from the cache. A high rate means a lower cost for the session.
 
