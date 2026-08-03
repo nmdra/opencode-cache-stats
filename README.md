@@ -1,6 +1,6 @@
 # cache-hit
 
-A no-LLM opencode TUI plugin that shows prompt-cache hit rate in a popup dialog.
+Very Simple opencode TUI plugin that shows prompt-cache hit rate in a popup dialog.
 
 Open it with the `/cache-hit` command (or the `cache-hit.show` command) while inside a session.
 
