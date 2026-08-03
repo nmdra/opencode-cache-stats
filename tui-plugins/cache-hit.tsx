@@ -1,4 +1,5 @@
 /** @jsxImportSource @opentui/solid */
+import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import type { TuiPlugin, TuiPluginModule, TuiPluginApi } from "@opencode-ai/plugin/tui"
 
 type Theme = TuiPluginApi["theme"]["current"]
@@ -183,6 +184,31 @@ function CacheHitView(props: {
   for (const model of props.models) maxKey = Math.max(maxKey, model.key.length)
   const cell = Math.min(Math.max(maxKey, 18), 32)
 
+  const dimensions = useTerminalDimensions()
+
+  let scroll: any
+  useKeyboard((evt) => {
+    if (!scroll) return
+    if (scroll.scrollHeight <= scroll.height) return
+    if (evt.name === "up") {
+      scroll.scrollBy(-1)
+      evt.preventDefault()
+      evt.stopPropagation()
+    } else if (evt.name === "down") {
+      scroll.scrollBy(1)
+      evt.preventDefault()
+      evt.stopPropagation()
+    } else if (evt.name === "pageup") {
+      scroll.scrollBy(-10)
+      evt.preventDefault()
+      evt.stopPropagation()
+    } else if (evt.name === "pagedown") {
+      scroll.scrollBy(10)
+      evt.preventDefault()
+      evt.stopPropagation()
+    }
+  })
+
   return (
     <box flexDirection="column" width="100%" paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={0}>
       <box flexDirection="row" width="100%" justifyContent="space-between">
@@ -195,65 +221,73 @@ function CacheHitView(props: {
         ───────────────────────────────
       </text>
 
-      <box height={1} />
+      <scrollbox
+        height={Math.min(36, Math.max(8, Math.floor(dimensions().height * 0.5)))}
+        scrollY
+        scrollbarOptions={{ trackOptions: { backgroundColor: theme.borderSubtle } }}
+        ref={(r) => {
+          scroll = r
+        }}
+      >
+        <box flexDirection="column" width="100%" gap={0}>
+          <text fg={headColor} wrapMode="none">
+            <b>{hitText(s)}</b> overall hit
+          </text>
+          <text fg={theme.textMuted} wrapMode="none">
+            {truncate(props.title, 60)}
+          </text>
 
-      <text fg={headColor} wrapMode="none">
-        <b>{hitText(s)}</b> overall hit
-      </text>
-      <text fg={theme.textMuted} wrapMode="none">
-        {truncate(props.title, 60)}
-      </text>
-
-      <box height={1} />
-
-      <text fg={theme.text} wrapMode="none">
-        <b>Models</b> <b fg={theme.textMuted}>· {String(props.models.length)}</b>
-      </text>
-      <box flexDirection="column" gap={0} paddingLeft={1}>
-        {props.models.map((model) => {
-          const m = model.acc
-          const mc = hitColor(theme, m)
-          const name = truncate(model.key, cell)
-          const count = m.count === 1 ? "msg" : "msgs"
-          return (
-            <text fg={theme.textMuted} wrapMode="none">
-              {padEnd(name, cell)} <b fg={mc}>{padStart(hitText(m), 6)}</b>  <b fg={theme.text}>{padStart(String(m.count), 3)} {count}</b>  in <b fg={theme.syntaxNumber ?? theme.text}>{padStart(fmt(m.input), 6)}</b>
-            </text>
-          )
-        })}
-      </box>
-
-      <box height={1} />
-
-      <text fg={theme.text} wrapMode="none">
-        <b>Totals</b> <b fg={theme.textMuted}>· main + {String(props.subagents)} {subWord}</b>
-      </text>
-      <box flexDirection="column" gap={0} paddingLeft={1}>
-        <text fg={theme.textMuted} wrapMode="none">
-          input <b fg={theme.syntaxNumber}>{fmt(s.input)}</b> · output <b fg={theme.syntaxNumber}>{fmt(s.output)}</b> · reasoning <b fg={theme.syntaxNumber}>{fmt(s.reasoning)}</b>
-        </text>
-        <text fg={theme.textMuted} wrapMode="none">
-          cache read <b fg={theme.info}>{fmt(s.cacheRead)}</b> · cache write <b fg={theme.warning}>{fmt(s.cacheWrite)}</b> · cost <b fg={theme.text}>{fmtCost(s.cost)}</b>
-        </text>
-      </box>
-
-      {props.subs.length > 0 ? (
-        <>
           <box height={1} />
+
           <text fg={theme.text} wrapMode="none">
-            <b>Subagents</b> <b fg={theme.textMuted}>· {String(props.subs.length)}</b>
+            <b>Models</b> <b fg={theme.textMuted}>· {String(props.models.length)}</b>
           </text>
           <box flexDirection="column" gap={0} paddingLeft={1}>
-            {props.subs.slice(0, 8).map((sub) => (
-              <text fg={theme.textMuted} wrapMode="none">
-                {truncate(sub.id, 20)} · <b fg={hitColorSub(theme, sub.hit)}>{sub.hit}</b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
-              </text>
-            ))}
+            {props.models.map((model) => {
+              const m = model.acc
+              const mc = hitColor(theme, m)
+              const name = truncate(model.key, cell)
+              const count = m.count === 1 ? "msg" : "msgs"
+              return (
+                <text fg={theme.textMuted} wrapMode="none">
+                  {padEnd(name, cell)} <b fg={mc}>{padStart(hitText(m), 6)}</b>  <b fg={theme.text}>{padStart(String(m.count), 3)} {count}</b>  in <b fg={theme.syntaxNumber ?? theme.text}>{padStart(fmt(m.input), 6)}</b>
+                </text>
+              )
+            })}
           </box>
-        </>
-      ) : null}
 
-      <box height={1} />
+          <box height={1} />
+
+          <text fg={theme.text} wrapMode="none">
+            <b>Totals</b> <b fg={theme.textMuted}>· main + {String(props.subagents)} {subWord}</b>
+          </text>
+          <box flexDirection="column" gap={0} paddingLeft={1}>
+            <text fg={theme.textMuted} wrapMode="none">
+              input <b fg={theme.syntaxNumber}>{fmt(s.input)}</b> · output <b fg={theme.syntaxNumber}>{fmt(s.output)}</b> · reasoning <b fg={theme.syntaxNumber}>{fmt(s.reasoning)}</b>
+            </text>
+            <text fg={theme.textMuted} wrapMode="none">
+              cache read <b fg={theme.info}>{fmt(s.cacheRead)}</b> · cache write <b fg={theme.warning}>{fmt(s.cacheWrite)}</b> · cost <b fg={theme.text}>{fmtCost(s.cost)}</b>
+            </text>
+          </box>
+
+          {props.subs.length > 0 ? (
+            <>
+              <box height={1} />
+              <text fg={theme.text} wrapMode="none">
+                <b>Subagents</b> <b fg={theme.textMuted}>· {String(props.subs.length)}</b>
+              </text>
+              <box flexDirection="column" gap={0} paddingLeft={1}>
+                {props.subs.map((sub) => (
+                  <text fg={theme.textMuted} wrapMode="none">
+                    {truncate(sub.id, 20)} · <b fg={hitColorSub(theme, sub.hit)}>{sub.hit}</b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
+                  </text>
+                ))}
+              </box>
+            </>
+          ) : null}
+        </box>
+      </scrollbox>
+
       <text fg={theme.borderSubtle} wrapMode="none">
         hit = cache read / (input + cache read + cache write)
       </text>
