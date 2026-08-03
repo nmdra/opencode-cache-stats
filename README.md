@@ -4,6 +4,8 @@ Very Simple opencode TUI plugin that shows prompt-cache hit rate in a popup dial
 
 Open it with the `/cache-stats` command (or the `cache-stats.show` command) while inside a session.
 
+![Cache stats dialog](assets/cache-stats.png)
+
 ## What it shows
 
 - Overall cache hit % for the active session with a color-coded verdict (`Excellent` / `Good` / `Fair` / `Poor`)
