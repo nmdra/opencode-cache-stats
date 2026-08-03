@@ -29,7 +29,7 @@ The plugin reads four values from the assistant messages.
 - `cache write` is the number of tokens written to the cache.
 - `reasoning` is the number of reasoning tokens.
 
-The plugin adds the values of the main session. Then it adds the values of each subagent.
+The plugin adds the values of the main session. Then it adds the values of each subagent. The totals are cumulative over every call in the session. A long session can show a cache read total that is much larger than the context window. Every call re-reads the same cached prefix, so the cache read count grows with each call.
 
 ## The rate formula
 

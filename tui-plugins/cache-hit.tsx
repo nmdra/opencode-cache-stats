@@ -17,6 +17,11 @@ type Acc = {
   calls: number
   callsWithCacheRead: number
   callsWithCacheWrite: number
+  lastInput: number
+  lastOutput: number
+  lastReasoning: number
+  lastCacheRead: number
+  lastCacheWrite: number
 }
 
 type Sub = { id: string; hit: string; msgs: number; calls: number; callsWithCacheRead: number }
@@ -68,6 +73,11 @@ function newAcc(): Acc {
     calls: 0,
     callsWithCacheRead: 0,
     callsWithCacheWrite: 0,
+    lastInput: 0,
+    lastOutput: 0,
+    lastReasoning: 0,
+    lastCacheRead: 0,
+    lastCacheWrite: 0,
   }
 }
 
@@ -150,6 +160,11 @@ function accCall(acc: Acc, call: Call): void {
   acc.calls += 1
   if (cacheRead > 0) acc.callsWithCacheRead += 1
   if (cacheWrite > 0) acc.callsWithCacheWrite += 1
+  acc.lastInput = input
+  acc.lastOutput = safe(t.output)
+  acc.lastReasoning = safe(t.reasoning)
+  acc.lastCacheRead = cacheRead
+  acc.lastCacheWrite = cacheWrite
 }
 
 function accMsg(acc: Acc, m: Msg): void {
@@ -169,7 +184,6 @@ function mergeAcc(dst: Acc, src: Acc): void {
   dst.callsWithCacheRead += src.callsWithCacheRead
   dst.callsWithCacheWrite += src.callsWithCacheWrite
 }
-
 function mergeModel(dst: Map<string, Acc>, src: Map<string, Acc>): void {
   for (const [k, v] of src) {
     let p = dst.get(k)
@@ -360,7 +374,15 @@ function CacheHitView(props: {
                 <b fg={s.callsWithCacheRead === s.calls ? theme.success : theme.text}>{String(s.callsWithCacheRead)}</b> of <b fg={theme.text}>{String(s.calls)}</b> calls read from cache
               </text>
             ) : null}
+            {s.lastInput + s.lastCacheRead > 0 ? (
+              <text fg={theme.textMuted} wrapMode="none">
+                latest request · <b fg={theme.text}>{fmt(s.lastInput + s.lastCacheRead)}</b> tokens in · cache read <b fg={theme.info}>{fmt(s.lastCacheRead)}</b>
+              </text>
+            ) : null}
           </box>
+          <text fg={theme.textMuted} wrapMode="none">
+            totals are cumulative over all calls
+          </text>
 
           {props.subs.length > 0 ? (
             <>

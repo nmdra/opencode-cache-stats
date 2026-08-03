@@ -42,6 +42,10 @@ The dialog sorts the models by message count. The model with the most messages i
 
 The totals section shows the sum of all messages. It shows the input tokens, the reasoning tokens, the cache read, and the cache write. It shows the output tokens and the cost. It also shows how many API calls read from the cache, for example `3 of 5 calls read from cache`.
 
+The totals add the values of every call in the session. The values grow as the session grows. A cache read total can be much larger than the context window. This is correct. Every call re-reads the same cached prefix. The values are not a snapshot of the current context.
+
+The section has a `latest request` line for comparison. It shows the token count of the most recent call. This value is close to the context size in the TUI.
+
 ## The subagents section
 
 The subagents section shows one line per subagent. Each line shows the subagent id, its cache rate, and its message count. When the subagent has API calls, the line also shows how many calls read from the cache.
