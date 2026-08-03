@@ -6,6 +6,14 @@ This guide explains how the plugin collects the data. It describes how the plugi
 
 The plugin reads the token data from the current session. It reads the same data from the child sessions. A child session is a subagent.
 
+## The API calls
+
+An assistant message can contain many provider steps. Each step is one API call. The plugin reads the step data from the message parts. It looks for parts of the type `step-finish`.
+
+When the parts have no step data, the plugin reads the totals of the whole assistant message. The step data is more exact than the message totals.
+
+The plugin counts the API calls. It also counts the calls that read from the cache and the calls that write to the cache.
+
 ## The messages
 
 The plugin reads the messages of a session. It counts only the assistant messages. An assistant message has a token count.
@@ -28,10 +36,12 @@ The plugin adds the values of the main session. Then it adds the values of each 
 The plugin computes the rate with the formula:
 
 ```
-hit = cache read / (input + cache read + cache write)
+hit = cache read / (input + cache read)
 ```
 
 The rate is a percentage. The plugin shows `n/a` when the sum of the values is zero. A session with no tokens gives no rate.
+
+The plugin excludes cache write from the rate. A cache write is a one-time priming cost. It is not part of the input that the provider serves again.
 
 ## The model list
 

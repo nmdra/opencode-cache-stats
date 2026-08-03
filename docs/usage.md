@@ -34,16 +34,16 @@ A high rate means that many tokens come from the cache. A low rate means that ma
 
 ## The models section
 
-The models section shows one line per model. Each line shows the model name, the hit rate of the model, and the message count of the model.
+The models section shows one line per model. Each line shows the model name and the hit rate of the model. When the model has API calls, the line also shows how many of those calls read from the cache, for example `3/5 calls hit`.
 
 The dialog sorts the models by message count. The model with the most messages is first.
 
 ## The totals section
 
-The totals section shows the sum of all messages. It shows the input tokens, the reasoning tokens, the cache read, and the cache write. It shows the output tokens and the cost.
+The totals section shows the sum of all messages. It shows the input tokens, the reasoning tokens, the cache read, and the cache write. It shows the output tokens and the cost. It also shows how many API calls read from the cache, for example `3 of 5 calls read from cache`.
 
 ## The subagents section
 
-The subagents section shows one line per subagent. Each line shows the subagent id, its cache rate, and its message count.
+The subagents section shows one line per subagent. Each line shows the subagent id, its cache rate, and its message count. When the subagent has API calls, the line also shows how many calls read from the cache.
 
 The dialog shows the first eight subagents. It does not show the rest.

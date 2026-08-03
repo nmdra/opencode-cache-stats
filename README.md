@@ -14,8 +14,10 @@ Open it with the `/cache-hit` command (or the `cache-hit.show` command) while in
 Cache hit rate is computed as:
 
 ```
-hit = cache read / (input + cache read + cache write)
+hit = cache read / (input + cache read)
 ```
+
+Cache write is a one-time priming cost and is excluded from the hit ratio. The plugin also reports how many API calls read from the cache.
 
 ## Install
 

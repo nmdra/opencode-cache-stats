@@ -9,10 +9,10 @@ You use it to see how much of the prompt input comes from the cache. A high rate
 The plugin uses this formula:
 
 ```
-hit = cache read / (input + cache read + cache write)
+hit = cache read / (input + cache read)
 ```
 
-The rate uses the token counts of the session. The counts come from the messages of the session and its subagents.
+The rate uses the token counts of the session. The counts come from the messages of the session and its subagents. Cache write is a one-time priming cost, so it is not part of the rate.
 
 ## Documents
 

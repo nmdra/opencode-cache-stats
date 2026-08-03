@@ -14,9 +14,12 @@ type Acc = {
   cacheWrite: number
   cost: number
   count: number
+  calls: number
+  callsWithCacheRead: number
+  callsWithCacheWrite: number
 }
 
-type Sub = { id: string; hit: string; msgs: number }
+type Sub = { id: string; hit: string; msgs: number; calls: number; callsWithCacheRead: number }
 
 type Collected = {
   acc: Acc
@@ -31,8 +34,12 @@ function fmt(n: number): string {
   return String(n)
 }
 
+function safe(n: unknown): number {
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : 0
+}
+
 function hitPct(t: Acc): number {
-  const denom = t.input + t.cacheRead + t.cacheWrite
+  const denom = t.input + t.cacheRead
   return denom <= 0 ? -1 : (100 * t.cacheRead) / denom
 }
 
@@ -50,7 +57,18 @@ function hitColor(theme: Theme, t: Acc): RGBA {
 }
 
 function newAcc(): Acc {
-  return { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 0 }
+  return {
+    input: 0,
+    output: 0,
+    reasoning: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    cost: 0,
+    count: 0,
+    calls: 0,
+    callsWithCacheRead: 0,
+    callsWithCacheWrite: 0,
+  }
 }
 
 function padStart(s: string, n: number): string {
@@ -65,15 +83,77 @@ function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s
 }
 
-function accMsg(acc: Acc, tokens: unknown, cost: number): void {
-  const t = tokens as { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } }
+type Tokens = { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } }
+
+type Part = { type?: string; tokens?: Tokens; cost?: number; model?: { providerID?: string; modelID?: string; id?: string } }
+
+type Msg = {
+  info?: { role?: string; tokens?: Tokens; cost?: number; providerID?: string; modelID?: string; model?: { providerID?: string; modelID?: string; id?: string } }
+  data?: { role?: string; tokens?: Tokens; cost?: number; providerID?: string; modelID?: string; model?: { providerID?: string; modelID?: string; id?: string } }
+  role?: string
+  type?: string
+  tokens?: Tokens
+  cost?: number
+  providerID?: string
+  modelID?: string
+  model?: { providerID?: string; modelID?: string; id?: string }
+  parts?: Part[]
+}
+
+type Call = { tokens?: Tokens; cost?: number; model?: Part["model"] }
+
+function msgRole(m: Msg): string | undefined {
+  return m.info?.role ?? m.data?.role ?? m.role ?? m.type
+}
+
+function msgTokens(m: Msg): Tokens | undefined {
+  return m.info?.tokens ?? m.data?.tokens ?? m.tokens
+}
+
+function msgCost(m: Msg): number {
+  return safe(m.info?.cost ?? m.data?.cost ?? m.cost)
+}
+
+function msgModel(m: Msg): Part["model"] {
+  return m.data?.model ?? m.info?.model ?? m.model
+}
+
+function msgProviderID(m: Msg): string | undefined {
+  return m.data?.providerID ?? m.data?.model?.providerID ?? m.info?.providerID ?? m.info?.model?.providerID ?? m.providerID ?? m.model?.providerID
+}
+
+function msgModelID(m: Msg): string | undefined {
+  return m.data?.modelID ?? m.data?.model?.modelID ?? m.data?.model?.id ?? m.info?.modelID ?? m.info?.model?.modelID ?? m.info?.model?.id ?? m.modelID ?? m.model?.modelID ?? m.model?.id
+}
+
+function collectCalls(m: Msg): Call[] {
+  const parts = m.parts ?? []
+  const steps = parts.filter((p) => p.type === "step-finish")
+  if (steps.length > 0) {
+    return steps.map((p) => ({ tokens: p.tokens, cost: p.cost, model: p.model }))
+  }
+  return [{ tokens: msgTokens(m), cost: m.info?.cost ?? m.data?.cost ?? m.cost, model: msgModel(m) }]
+}
+
+function accCall(acc: Acc, call: Call): void {
+  const t = call.tokens
   if (!t) return
-  acc.input += t.input ?? 0
-  acc.output += t.output ?? 0
-  acc.reasoning += t.reasoning ?? 0
-  acc.cacheRead += t.cache?.read ?? 0
-  acc.cacheWrite += t.cache?.write ?? 0
-  acc.cost += cost ?? 0
+  const input = safe(t.input)
+  const cacheRead = safe(t.cache?.read)
+  const cacheWrite = safe(t.cache?.write)
+  acc.input += input
+  acc.output += safe(t.output)
+  acc.reasoning += safe(t.reasoning)
+  acc.cacheRead += cacheRead
+  acc.cacheWrite += cacheWrite
+  acc.cost += safe(call.cost)
+  acc.calls += 1
+  if (cacheRead > 0) acc.callsWithCacheRead += 1
+  if (cacheWrite > 0) acc.callsWithCacheWrite += 1
+}
+
+function accMsg(acc: Acc, m: Msg): void {
+  for (const call of collectCalls(m)) accCall(acc, call)
   acc.count += 1
 }
 
@@ -85,6 +165,9 @@ function mergeAcc(dst: Acc, src: Acc): void {
   dst.cacheWrite += src.cacheWrite
   dst.cost += src.cost
   dst.count += src.count
+  dst.calls += src.calls
+  dst.callsWithCacheRead += src.callsWithCacheRead
+  dst.callsWithCacheWrite += src.callsWithCacheWrite
 }
 
 function mergeModel(dst: Map<string, Acc>, src: Map<string, Acc>): void {
@@ -98,9 +181,9 @@ function mergeModel(dst: Map<string, Acc>, src: Map<string, Acc>): void {
   }
 }
 
-function modelKey(m: any): string {
-  const p = m.providerID ?? m.model?.providerID ?? "?"
-  const q = m.modelID ?? m.model?.id ?? "?"
+function modelKey(m: Msg): string {
+  const p = msgProviderID(m) ?? "?"
+  const q = msgModelID(m) ?? "?"
   return `${p}/${q}`
 }
 
@@ -117,15 +200,14 @@ async function collect(
   if (visited.has(sessionID)) return { acc: newAcc(), subagents: 0, perModel: new Map(), subs: [] }
   visited.add(sessionID)
 
-  let messages: any[] = []
+  let messages: Msg[] = []
   try {
     const res: any = await client.session.messages({ sessionID })
-    const list = res?.data ?? res ?? []
-    messages = list.map((row: any) => row?.info ?? row)
+    messages = (res?.data ?? res ?? []) as Msg[]
   } catch {}
   if (messages.length === 0) {
     try {
-      messages = state.session.messages(sessionID) ?? []
+      messages = (state.session.messages(sessionID) ?? []) as Msg[]
     } catch {}
   }
 
@@ -133,16 +215,16 @@ async function collect(
   const perModel = new Map<string, Acc>()
   for (const m of messages ?? []) {
     if (!m) continue
-    const isAssistant = m.role === "assistant" || m.type === "assistant"
-    if (!isAssistant || !m.tokens) continue
+    const isAssistant = msgRole(m) === "assistant"
+    if (!isAssistant) continue
     const key = modelKey(m)
     let p = perModel.get(key)
     if (!p) {
       p = newAcc()
       perModel.set(key, p)
     }
-    accMsg(p, m.tokens, m.cost)
-    accMsg(acc, m.tokens, m.cost)
+    accMsg(p, m)
+    accMsg(acc, m)
   }
 
   let children: any[] = []
@@ -158,7 +240,7 @@ async function collect(
     if (!cid) continue
     const sub = await collect(client, state, cid, visited)
     subagents += 1 + sub.subagents
-    subs.push({ id: cid, hit: hitText(sub.acc), msgs: sub.acc.count })
+    subs.push({ id: cid, hit: hitText(sub.acc), msgs: sub.acc.count, calls: sub.acc.calls, callsWithCacheRead: sub.acc.callsWithCacheRead })
     mergeAcc(acc, sub.acc)
     mergeModel(perModel, sub.perModel)
     subs.push(...sub.subs)
@@ -247,10 +329,15 @@ function CacheHitView(props: {
               const m = model.acc
               const mc = hitColor(theme, m)
               const name = truncate(model.key, cell)
-              const count = m.count === 1 ? "msg" : "msgs"
               return (
                 <text fg={theme.textMuted} wrapMode="none">
-                  {padEnd(name, cell)} <b fg={mc}>{padStart(hitText(m), 6)}</b>  <b fg={theme.text}>{padStart(String(m.count), 3)} {count}</b>  in <b fg={theme.syntaxNumber ?? theme.text}>{padStart(fmt(m.input), 6)}</b>
+                  {padEnd(name, cell)} <b fg={mc}>{padStart(hitText(m), 6)}</b>
+                  {m.calls > 0 ? (
+                    <b fg={m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted}>
+                      {"  "}
+                      {String(m.callsWithCacheRead)}/{String(m.calls)} calls hit
+                    </b>
+                  ) : null}
                 </text>
               )
             })}
@@ -268,6 +355,11 @@ function CacheHitView(props: {
             <text fg={theme.textMuted} wrapMode="none">
               cache read <b fg={theme.info}>{fmt(s.cacheRead)}</b> · cache write <b fg={theme.warning}>{fmt(s.cacheWrite)}</b> · cost <b fg={theme.text}>{fmtCost(s.cost)}</b>
             </text>
+            {s.calls > 0 ? (
+              <text fg={theme.textMuted} wrapMode="none">
+                <b fg={s.callsWithCacheRead === s.calls ? theme.success : theme.text}>{String(s.callsWithCacheRead)}</b> of <b fg={theme.text}>{String(s.calls)}</b> calls read from cache
+              </text>
+            ) : null}
           </box>
 
           {props.subs.length > 0 ? (
@@ -280,6 +372,7 @@ function CacheHitView(props: {
                 {props.subs.map((sub) => (
                   <text fg={theme.textMuted} wrapMode="none">
                     {truncate(sub.id, 20)} · <b fg={hitColorSub(theme, sub.hit)}>{sub.hit}</b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
+                    {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} calls hit` : ""}
                   </text>
                 ))}
               </box>
@@ -289,7 +382,7 @@ function CacheHitView(props: {
       </scrollbox>
 
       <text fg={theme.borderSubtle} wrapMode="none">
-        hit = cache read / (input + cache read + cache write)
+        hit = cache read / (input + cache read)
       </text>
     </box>
   )
