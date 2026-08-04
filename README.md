@@ -4,12 +4,14 @@ Very Simple opencode TUI plugin that shows prompt-cache hit rate in a popup dial
 
 Open it with the `/cache-stats` command (or the `cache-stats.show` command) while inside a session.
 
-![Cache stats dialog](assets/cache-stats.png)
+| Summary and models | Totals breakdown | Subagents |
+|:---:|:---:|:---:|
+| ![Session summary and models](assets/preview-summary.jpeg) | ![Grouped totals](assets/preview-totals.jpeg) | ![Subagent list](assets/preview-subagents.jpeg) |
 
 ## What it shows
 
-- Overall cache hit % for the active session with a color-coded verdict (`Excellent` / `Good` / `Fair` / `Poor`)
-- A session summary: hit bar, total calls, model and subagent counts, total tokens, total cost
+- Overall cache hit % for the active session with a color-coded hit bar and verdict (`Excellent` / `Good` / `Fair` / `Poor`)
+- A session summary: total calls, model and subagent counts, total tokens, total cost
 - Per-model breakdown with hit bars, hit %, and token totals
 - Grouped totals (tokens, calls, cost) with percentages, averages per call, and the last request
 - Subagent list with per-subagent hit rates and the model each one used
