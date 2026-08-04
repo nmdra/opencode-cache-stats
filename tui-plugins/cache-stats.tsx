@@ -33,6 +33,25 @@ type Collected = {
   subs: Sub[]
 }
 
+type SessionChild = { id?: string; agent?: string; agentType?: string; title?: string }
+
+type StateSessionWithChildren = { children?: (sessionID: string) => SessionChild[] | undefined }
+
+type NormalizedMsg = {
+  role?: string
+  tokens?: Tokens
+  cost: number
+  providerID?: string
+  modelID?: string
+  model?: Part["model"]
+}
+
+type ScrollHandle = {
+  scrollHeight: number
+  height: number
+  scrollBy(delta: number): void
+}
+
 function fmt(n: number): string {
   if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`
   if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`
@@ -46,6 +65,18 @@ function safe(n: unknown): number {
 const HIT_EXCELLENT = 90
 const HIT_GOOD = 70
 const HIT_FAIR = 40
+
+const PANEL_WIDTH = 58
+const SCROLL_HEIGHT = 14
+const BAR_WIDTH = 10
+const CELL_MIN = 18
+const CELL_MAX = 22
+const TITLE_MAX = 60
+const EMPTY_TITLE_MAX = 40
+const SUB_NAME_MAX = 18
+const SUB_ID_MAX = 8
+const SUB_FALLBACK_MAX = 20
+const SEPARATOR = "─".repeat(31)
 
 function hitPct(t: Acc): number {
   const denom = t.input + t.cacheRead
@@ -155,37 +186,30 @@ type Msg = {
 
 type Call = { tokens?: Tokens; cost?: number; model?: Part["model"] }
 
-function msgRole(m: Msg): string | undefined {
-  return m.info?.role ?? m.data?.role ?? m.role ?? m.type
+function normalizeMsg(m: Msg): NormalizedMsg {
+  const info = m.info
+  const data = m.data
+  const model = data?.model ?? info?.model ?? m.model
+  return {
+    role: info?.role ?? data?.role ?? m.role ?? m.type,
+    tokens: info?.tokens ?? data?.tokens ?? m.tokens,
+    cost: safe(info?.cost ?? data?.cost ?? m.cost),
+    providerID:
+      data?.providerID ?? data?.model?.providerID ?? info?.providerID ?? info?.model?.providerID ?? m.providerID ?? m.model?.providerID,
+    modelID:
+      data?.modelID ?? data?.model?.modelID ?? data?.model?.id ?? info?.modelID ?? info?.model?.modelID ?? info?.model?.id ?? m.modelID ??
+      m.model?.modelID ?? m.model?.id,
+    model,
+  }
 }
 
-function msgTokens(m: Msg): Tokens | undefined {
-  return m.info?.tokens ?? m.data?.tokens ?? m.tokens
-}
-
-function msgCost(m: Msg): number {
-  return safe(m.info?.cost ?? m.data?.cost ?? m.cost)
-}
-
-function msgModel(m: Msg): Part["model"] {
-  return m.data?.model ?? m.info?.model ?? m.model
-}
-
-function msgProviderID(m: Msg): string | undefined {
-  return m.data?.providerID ?? m.data?.model?.providerID ?? m.info?.providerID ?? m.info?.model?.providerID ?? m.providerID ?? m.model?.providerID
-}
-
-function msgModelID(m: Msg): string | undefined {
-  return m.data?.modelID ?? m.data?.model?.modelID ?? m.data?.model?.id ?? m.info?.modelID ?? m.info?.model?.modelID ?? m.info?.model?.id ?? m.modelID ?? m.model?.modelID ?? m.model?.id
-}
-
-function collectCalls(m: Msg): Call[] {
+function collectCalls(m: Msg, nm: NormalizedMsg): Call[] {
   const parts = m.parts ?? []
   const steps = parts.filter((p) => p.type === "step-finish")
   if (steps.length > 0) {
     return steps.map((p) => ({ tokens: p.tokens, cost: p.cost, model: p.model }))
   }
-  return [{ tokens: msgTokens(m), cost: m.info?.cost ?? m.data?.cost ?? m.cost, model: msgModel(m) }]
+  return [{ tokens: nm.tokens, cost: nm.cost, model: nm.model }]
 }
 
 function accCall(acc: Acc, call: Call): void {
@@ -210,8 +234,8 @@ function accCall(acc: Acc, call: Call): void {
   acc.lastCacheWrite = cacheWrite
 }
 
-function accMsg(acc: Acc, m: Msg): void {
-  for (const call of collectCalls(m)) accCall(acc, call)
+function accMsg(acc: Acc, m: Msg, nm: NormalizedMsg): void {
+  for (const call of collectCalls(m, nm)) accCall(acc, call)
   acc.count += 1
 }
 
@@ -238,18 +262,20 @@ function mergeModel(dst: Map<string, Acc>, src: Map<string, Acc>): void {
   }
 }
 
-function modelKey(m: Msg): string {
-  const p = msgProviderID(m) ?? "?"
-  const q = msgModelID(m) ?? "?"
+function modelKey(nm: NormalizedMsg): string {
+  const p = nm.providerID ?? "?"
+  const q = nm.modelID ?? "?"
   return `${p}/${q}`
 }
 
-function agentName(child: any): string {
+const SUBAGENT_TITLE_RE = /\(@([^)\s]+)\s+subagent\)/
+
+function agentName(child: SessionChild): string {
   const raw = child?.agent ?? child?.agentType
   if (typeof raw === "string" && raw.trim()) return raw.trim()
   const title = child?.title
   if (typeof title === "string") {
-    const m = title.match(/\(@([^)\s]+)\s+subagent\)/)
+    const m = title.match(SUBAGENT_TITLE_RE)
     if (m) return m[1]
     const word = title.split(/\s+/)[0]
     if (word) return word
@@ -261,6 +287,32 @@ function fmtCost(n: number): string {
   return n === 0 ? "$0" : `$${n.toFixed(2)}`
 }
 
+async function fetchList<T>(
+  api: () => Promise<T[] | { data?: T[] }>,
+  state: () => T[],
+  tag: string,
+): Promise<T[]> {
+  let apiErr: unknown
+  try {
+    const res = await api()
+    const data = Array.isArray(res) ? res : res?.data
+    if (Array.isArray(data) && data.length > 0) return data
+  } catch (err) {
+    apiErr = err
+  }
+  let stateErr: unknown
+  try {
+    const data = state()
+    if (Array.isArray(data) && data.length > 0) return data
+  } catch (err) {
+    stateErr = err
+  }
+  if (apiErr !== undefined || stateErr !== undefined) {
+    console.error(`[cache-stats] ${tag}: no data`, { api: apiErr, state: stateErr })
+  }
+  return []
+}
+
 async function collect(
   client: TuiPluginApi["client"],
   state: TuiPluginApi["state"],
@@ -270,54 +322,48 @@ async function collect(
   if (visited.has(sessionID)) return { acc: newAcc(), subagents: 0, perModel: new Map(), subs: [] }
   visited.add(sessionID)
 
-  let messages: Msg[] = []
-  try {
-    const res: any = await client.session.messages({ sessionID })
-    const data = res?.data ?? res
-    messages = Array.isArray(data) ? (data as Msg[]) : []
-  } catch {}
-  if (messages.length === 0) {
-    try {
-      const data = state.session.messages(sessionID)
-      messages = Array.isArray(data) ? (data as Msg[]) : []
-    } catch {}
-  }
+  const [messages, children] = await Promise.all([
+    fetchList<Msg>(
+      () => client.session.messages({ sessionID }),
+      () => state.session.messages(sessionID),
+      "messages",
+    ),
+    fetchList<SessionChild>(
+      () => client.session.children({ sessionID }),
+      () => (state.session as unknown as StateSessionWithChildren).children?.(sessionID) ?? [],
+      "children",
+    ),
+  ])
 
   const acc = newAcc()
   const perModel = new Map<string, Acc>()
-  for (const m of messages ?? []) {
+  for (const m of messages) {
     if (!m) continue
-    const isAssistant = msgRole(m) === "assistant"
-    if (!isAssistant) continue
-    const key = modelKey(m)
+    const nm = normalizeMsg(m)
+    if (nm.role !== "assistant") continue
+    const key = modelKey(nm)
     let p = perModel.get(key)
     if (!p) {
       p = newAcc()
       perModel.set(key, p)
     }
-    accMsg(p, m)
-    accMsg(acc, m)
+    accMsg(p, m, nm)
   }
+  for (const p of perModel.values()) mergeAcc(acc, p)
 
-  let children: any[] = []
   let subagents = 0
   const subs: Sub[] = []
-  try {
-    const res: any = await client.session.children({ sessionID })
-    const data = res?.data ?? res
-    children = Array.isArray(data) ? data : []
-  } catch {}
-  if (children.length === 0) {
-    try {
-      const data = (state.session as any).children?.(sessionID)
-      children = Array.isArray(data) ? data : []
-    } catch {}
-  }
-
-  for (const child of children) {
-    const cid = child?.id ?? ""
-    if (!cid) continue
-    const sub = await collect(client, state, cid, visited)
+  const results = await Promise.all(
+    children.map(async (child) => {
+      const cid = child?.id ?? ""
+      if (!cid) return null
+      const sub = await collect(client, state, cid, visited)
+      return { child, cid, sub }
+    }),
+  )
+  for (const r of results) {
+    if (!r) continue
+    const { child, cid, sub } = r
     subagents += 1 + sub.subagents
     subs.push({
       id: cid,
@@ -335,6 +381,108 @@ async function collect(
   return { acc, subagents, perModel, subs }
 }
 
+function SectionHeader(props: { theme: Theme; title: string; count: string }) {
+  return (
+    <box flexDirection="row" gap={1}>
+      <text fg={props.theme.accent}>│</text>
+      <text fg={props.theme.secondary}>
+        <b>{props.title}</b> <b><span style={{ fg: props.theme.textMuted }}>· {props.count}</span></b>
+      </text>
+    </box>
+  )
+}
+
+function ModelsSection(props: { theme: Theme; models: { key: string; acc: Acc }[]; cell: number }) {
+  const theme = props.theme
+  return (
+    <>
+      <SectionHeader theme={theme} title="Models" count={String(props.models.length)} />
+      <box flexDirection="column" gap={0} paddingLeft={2}>
+        {props.models.map((model) => {
+          const m = model.acc
+          const mh = hitPct(m)
+          const mc = hitColor(theme, mh)
+          const name = truncate(short(model.key), props.cell)
+          return (
+            <text fg={theme.textMuted} wrapMode="none">
+              {padEnd(name, props.cell)}  <b><span style={{ fg: mc }}>{padStart(fmtHit(mh), 6)}</span></b>  <HitBar theme={theme} pct={mh} width={BAR_WIDTH} />
+              {m.calls > 0 ? (
+                <b>
+                  <span style={{ fg: m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted }}>
+                    {"  "}
+                    {String(m.callsWithCacheRead)}/{String(m.calls)}
+                  </span>
+                </b>
+              ) : null}
+            </text>
+          )
+        })}
+      </box>
+    </>
+  )
+}
+
+function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
+  const theme = props.theme
+  const s = props.s
+  const subWord = props.subagents === 1 ? "subagent" : "subagents"
+  return (
+    <>
+      <SectionHeader theme={theme} title="Totals" count={`main + ${String(props.subagents)} ${subWord}`} />
+      <box flexDirection="column" gap={0} paddingLeft={2}>
+        <text fg={theme.textMuted} wrapMode="none">
+          fresh input <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.input)}</span></b> · output <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.output)}</span></b> · reasoning <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.reasoning)}</span></b>
+        </text>
+        <text fg={theme.textMuted} wrapMode="none">
+          cache read <b><span style={{ fg: theme.info }}>{fmt(s.cacheRead)}</span></b> · cache write <b><span style={{ fg: theme.warning }}>{fmt(s.cacheWrite)}</span></b> · cost <b><span style={{ fg: theme.text }}>{fmtCost(s.cost)}</span></b>
+        </text>
+        {s.calls > 0 ? (
+          <text fg={theme.textMuted} wrapMode="none">
+            <b><span style={{ fg: s.callsWithCacheRead === s.calls ? theme.success : theme.text }}>{String(s.callsWithCacheRead)}</span></b> of <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls read from cache
+          </text>
+        ) : null}
+        {s.lastInput + s.lastCacheRead > 0 ? (
+          <text fg={theme.textMuted} wrapMode="none">
+            <b><span style={{ fg: theme.accent }}>most recent request</span></b> · <b><span style={{ fg: theme.text }}>{fmt(s.lastInput + s.lastCacheRead)}</span></b> tokens · <b><span style={{ fg: theme.info }}>{fmt(s.lastCacheRead)}</span></b> cache
+          </text>
+        ) : null}
+      </box>
+      <text fg={theme.textMuted} wrapMode="none">
+        totals are cumulative over all calls
+      </text>
+    </>
+  )
+}
+
+function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
+  const theme = props.theme
+  if (props.subs.length === 0) return null
+  return (
+    <>
+      <box height={1} />
+      <SectionHeader theme={theme} title="Subagents" count={String(props.subs.length)} />
+      <box flexDirection="column" gap={0} paddingLeft={2}>
+        {props.subs.map((sub) => {
+          return (
+            <text fg={theme.textMuted} wrapMode="none">
+              {sub.name !== sub.id ? (
+                <>
+                  <b><span style={{ fg: theme.text }}>{truncate(sub.name, SUB_NAME_MAX)}</span></b>{" "}
+                  <b><span style={{ fg: theme.textMuted }}>{truncate(sub.id, SUB_ID_MAX)}</span></b>
+                </>
+              ) : (
+                truncate(sub.id, SUB_FALLBACK_MAX)
+              )}{" "}
+              · <b><span style={{ fg: hitColor(theme, sub.hit) }}>{fmtHit(sub.hit)}</span></b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
+              {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit` : ""}
+            </text>
+          )
+        })}
+      </box>
+    </>
+  )
+}
+
 function CacheStatsView(props: {
   theme: Theme
   title: string
@@ -348,15 +496,11 @@ function CacheStatsView(props: {
   const h = hitPct(s)
   const headColor = hitColor(theme, h)
   const verdict = hitVerdict(theme, h)
-  const subWord = props.subagents === 1 ? "subagent" : "subagents"
   let maxKey = 0
   for (const model of props.models) maxKey = Math.max(maxKey, short(model.key).length)
-  const cell = Math.min(Math.max(maxKey, 18), 22)
+  const cell = Math.min(Math.max(maxKey, CELL_MIN), CELL_MAX)
 
-  const panelW = 58
-  const barW = 10
-
-  let scroll: any
+  let scroll: ScrollHandle | undefined
   useKeyboard((evt) => {
     if (!scroll) return
     if (scroll.scrollHeight <= scroll.height) return
@@ -380,7 +524,7 @@ function CacheStatsView(props: {
   })
 
   return (
-    <box flexDirection="column" width={panelW} paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={0}>
+    <box flexDirection="column" width={PANEL_WIDTH} paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={0}>
       <box flexDirection="row" width="100%" justifyContent="space-between">
         <text fg={theme.primary}>
           <b>Cache stats</b>
@@ -388,22 +532,22 @@ function CacheStatsView(props: {
         <text fg={theme.textMuted}>{props.models.length + props.subs.length > 12 ? "↑/↓ · esc" : "esc"}</text>
       </box>
       <text fg={theme.borderSubtle} wrapMode="none">
-        ───────────────────────────────
+        {SEPARATOR}
       </text>
 
       <scrollbox
-        height={14}
+        height={SCROLL_HEIGHT}
         scrollY
         scrollbarOptions={{ trackOptions: { backgroundColor: theme.borderSubtle } }}
         viewportOptions={{ paddingRight: 2 }}
         ref={(r) => {
-          scroll = r
+          scroll = r as ScrollHandle
         }}
       >
         {s.calls === 0 ? (
           <box flexDirection="column" width="100%" gap={0} paddingTop={2} paddingBottom={2}>
             <text fg={theme.textMuted} wrapMode="none">
-              No cache stats data for <b><span style={{ fg: theme.text }}>{truncate(props.title, 40)}</span></b> yet.
+              No cache stats data for <b><span style={{ fg: theme.text }}>{truncate(props.title, EMPTY_TITLE_MAX)}</span></b> yet.
             </text>
             <text fg={theme.textMuted} wrapMode="none">
               Run a few turns in the session, then open again.
@@ -415,98 +559,18 @@ function CacheStatsView(props: {
               <b><span style={{ fg: headColor }}>{hitText(s)}</span></b> <b><span style={{ fg: verdict.color }}>{verdict.word}</span></b> · overall hit · <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls
             </text>
             <text fg={theme.textMuted} wrapMode="none">
-              {truncate(props.title, 60)}
+              {truncate(props.title, TITLE_MAX)}
             </text>
 
             <box height={1} />
 
-            <box flexDirection="row" gap={1}>
-              <text fg={theme.accent}>│</text>
-              <text fg={theme.secondary}>
-                <b>Models</b> <b><span style={{ fg: theme.textMuted }}>· {String(props.models.length)}</span></b>
-              </text>
-            </box>
-            <box flexDirection="column" gap={0} paddingLeft={2}>
-              {props.models.map((model) => {
-                const m = model.acc
-                const mh = hitPct(m)
-                const mc = hitColor(theme, mh)
-                const name = truncate(short(model.key), cell)
-                return (
-                  <text fg={theme.textMuted} wrapMode="none">
-                    {padEnd(name, cell)}  <b><span style={{ fg: mc }}>{padStart(fmtHit(mh), 6)}</span></b>  <HitBar theme={theme} pct={mh} width={barW} />
-                    {m.calls > 0 ? (
-                      <b>
-                        <span style={{ fg: m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted }}>
-                          {"  "}
-                          {String(m.callsWithCacheRead)}/{String(m.calls)}
-                        </span>
-                      </b>
-                    ) : null}
-                  </text>
-                )
-              })}
-            </box>
+            <ModelsSection theme={theme} models={props.models} cell={cell} />
 
             <box height={1} />
 
-            <box flexDirection="row" gap={1}>
-              <text fg={theme.accent}>│</text>
-              <text fg={theme.secondary}>
-                <b>Totals</b> <b><span style={{ fg: theme.textMuted }}>· main + {String(props.subagents)} {subWord}</span></b>
-              </text>
-            </box>
-            <box flexDirection="column" gap={0} paddingLeft={2}>
-              <text fg={theme.textMuted} wrapMode="none">
-                fresh input <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.input)}</span></b> · output <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.output)}</span></b> · reasoning <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.reasoning)}</span></b>
-              </text>
-              <text fg={theme.textMuted} wrapMode="none">
-                cache read <b><span style={{ fg: theme.info }}>{fmt(s.cacheRead)}</span></b> · cache write <b><span style={{ fg: theme.warning }}>{fmt(s.cacheWrite)}</span></b> · cost <b><span style={{ fg: theme.text }}>{fmtCost(s.cost)}</span></b>
-              </text>
-              {s.calls > 0 ? (
-                <text fg={theme.textMuted} wrapMode="none">
-                  <b><span style={{ fg: s.callsWithCacheRead === s.calls ? theme.success : theme.text }}>{String(s.callsWithCacheRead)}</span></b> of <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls read from cache
-                </text>
-              ) : null}
-              {s.lastInput + s.lastCacheRead > 0 ? (
-                <text fg={theme.textMuted} wrapMode="none">
-                  <b><span style={{ fg: theme.accent }}>most recent request</span></b> · <b><span style={{ fg: theme.text }}>{fmt(s.lastInput + s.lastCacheRead)}</span></b> tokens · <b><span style={{ fg: theme.info }}>{fmt(s.lastCacheRead)}</span></b> cache
-                </text>
-              ) : null}
-            </box>
-            <text fg={theme.textMuted} wrapMode="none">
-              totals are cumulative over all calls
-            </text>
+            <TotalsSection theme={theme} s={s} subagents={props.subagents} />
 
-            {props.subs.length > 0 ? (
-              <>
-                <box height={1} />
-                <box flexDirection="row" gap={1}>
-                  <text fg={theme.accent}>│</text>
-                  <text fg={theme.secondary}>
-                    <b>Subagents</b> <b><span style={{ fg: theme.textMuted }}>· {String(props.subs.length)}</span></b>
-                  </text>
-                </box>
-                <box flexDirection="column" gap={0} paddingLeft={2}>
-                  {props.subs.map((sub) => {
-                    return (
-                      <text fg={theme.textMuted} wrapMode="none">
-                        {sub.name !== sub.id ? (
-                          <>
-                            <b><span style={{ fg: theme.text }}>{truncate(sub.name, 18)}</span></b>{" "}
-                            <b><span style={{ fg: theme.textMuted }}>{truncate(sub.id, 8)}</span></b>
-                          </>
-                        ) : (
-                          truncate(sub.id, 20)
-                        )}{" "}
-                        · <b><span style={{ fg: hitColor(theme, sub.hit) }}>{fmtHit(sub.hit)}</span></b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
-                        {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit` : ""}
-                      </text>
-                    )
-                  })}
-                </box>
-              </>
-            ) : null}
+            <SubagentsSection theme={theme} subs={props.subs} />
           </box>
         )}
       </scrollbox>
