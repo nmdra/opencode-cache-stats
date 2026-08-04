@@ -516,8 +516,8 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
         <TreeRow theme={theme} label="Cache Hits" value={String(s.callsWithCacheRead)} suffix={pctSuffix(s.callsWithCacheRead, s.calls)} />
         <TreeRow theme={theme} label="Cache Misses" value={String(s.calls - s.callsWithCacheRead)} />
         <text fg={theme.textMuted} wrapMode="none">
-          └─ {padEnd("Cache Efficiency", 16)} <HitBar theme={theme} pct={effH} width={BAR_WIDTH} />{" "}
-          <b><span style={{ fg: effColor }}>{fmtHit(effH)}</span></b>
+          └─ {padEnd("Cache Efficiency", 16)} <b><span style={{ fg: effColor }}>{fmtHit(effH)}</span></b>{" "}
+          <HitBar theme={theme} pct={effH} width={BAR_WIDTH} />
         </text>
         <GroupLabel theme={theme} title="Cost" />
         <TreeRow theme={theme} label="Total Cost" value={fmtCost(s.cost)} />
