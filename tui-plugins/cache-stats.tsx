@@ -76,6 +76,8 @@ const EMPTY_TITLE_MAX = 40
 const SUB_NAME_MAX = 18
 const SUB_ID_MAX = 8
 const SUB_FALLBACK_MAX = 20
+const SCROLL_HINT_MIN = 12
+const PAGE_STEP = 10
 const SEPARATOR = "─".repeat(31)
 
 function hitPct(t: Acc): number {
@@ -91,27 +93,19 @@ function hitText(t: Acc): string {
   return fmtHit(hitPct(t))
 }
 
-function hitColor(theme: Theme, h: number): RGBA {
-  if (h < 0) return theme.textMuted
-  if (h >= HIT_EXCELLENT) return theme.success
-  if (h >= HIT_GOOD) return theme.info
-  if (h >= HIT_FAIR) return theme.warning
-  return theme.error
-}
-
-function hitVerdict(theme: Theme, h: number): { word: string; color: RGBA } {
-  if (h < 0) return { word: "—", color: theme.textMuted }
-  if (h >= HIT_EXCELLENT) return { word: "Excellent", color: theme.success }
-  if (h >= HIT_GOOD) return { word: "Good", color: theme.info }
-  if (h >= HIT_FAIR) return { word: "Fair", color: theme.warning }
-  return { word: "Poor", color: theme.error }
+function hitStyle(theme: Theme, h: number): { color: RGBA; word: string } {
+  if (h < 0) return { color: theme.textMuted, word: "—" }
+  if (h >= HIT_EXCELLENT) return { color: theme.success, word: "Excellent" }
+  if (h >= HIT_GOOD) return { color: theme.info, word: "Good" }
+  if (h >= HIT_FAIR) return { color: theme.warning, word: "Fair" }
+  return { color: theme.error, word: "Poor" }
 }
 
 function hitSegments(theme: Theme, h: number, width: number): { color: RGBA; filled: string; empty: string } {
   const w = Math.max(4, width)
   if (h < 0) return { color: theme.textMuted, filled: "·".repeat(w), empty: "" }
   const filled = Math.round((h / 100) * w)
-  return { color: hitColor(theme, h), filled: "█".repeat(filled), empty: "░".repeat(Math.max(0, w - filled)) }
+  return { color: hitStyle(theme, h).color, filled: "█".repeat(filled), empty: "░".repeat(Math.max(0, w - filled)) }
 }
 
 function HitBar(props: { theme: Theme; pct: number; width: number }) {
@@ -195,9 +189,9 @@ function normalizeMsg(m: Msg): NormalizedMsg {
   const data = m.data
   const model = data?.model ?? info?.model ?? m.model
   return {
-    role: info?.role ?? data?.role ?? m.role ?? m.type,
-    tokens: info?.tokens ?? data?.tokens ?? m.tokens,
-    cost: safe(info?.cost ?? data?.cost ?? m.cost),
+    role: data?.role ?? info?.role ?? m.role ?? m.type,
+    tokens: data?.tokens ?? info?.tokens ?? m.tokens,
+    cost: safe(data?.cost ?? info?.cost ?? m.cost),
     providerID:
       data?.providerID ?? data?.model?.providerID ?? info?.providerID ?? info?.model?.providerID ?? m.providerID ?? m.model?.providerID,
     modelID:
@@ -403,7 +397,7 @@ function ModelsSection(props: { theme: Theme; models: { key: string; acc: Acc }[
         {props.models.map((model) => {
           const m = model.acc
           const mh = hitPct(m)
-          const mc = hitColor(theme, mh)
+          const mc = hitStyle(theme, mh).color
           const name = truncate(short(model.key), props.cell)
           return (
             <text fg={theme.textMuted} wrapMode="none">
@@ -475,7 +469,7 @@ function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
               ) : (
                 truncate(sub.id, SUB_FALLBACK_MAX)
               )}{" "}
-              · <b><span style={{ fg: hitColor(theme, sub.hit) }}>{fmtHit(sub.hit)}</span></b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
+              · <b><span style={{ fg: hitStyle(theme, sub.hit).color }}>{fmtHit(sub.hit)}</span></b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
               {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit` : ""}
             </text>
           )
@@ -496,8 +490,7 @@ function CacheStatsView(props: {
   const theme = props.theme
   const s = props.acc
   const h = hitPct(s)
-  const headColor = hitColor(theme, h)
-  const verdict = hitVerdict(theme, h)
+  const head = hitStyle(theme, h)
   let maxKey = 0
   for (const model of props.models) maxKey = Math.max(maxKey, short(model.key).length)
   const cell = Math.min(Math.max(maxKey, CELL_MIN), CELL_MAX)
@@ -515,11 +508,11 @@ function CacheStatsView(props: {
       evt.preventDefault()
       evt.stopPropagation()
     } else if (evt.name === "pageup") {
-      scroll.scrollBy(-10)
+      scroll.scrollBy(-PAGE_STEP)
       evt.preventDefault()
       evt.stopPropagation()
     } else if (evt.name === "pagedown") {
-      scroll.scrollBy(10)
+      scroll.scrollBy(PAGE_STEP)
       evt.preventDefault()
       evt.stopPropagation()
     }
@@ -531,7 +524,7 @@ function CacheStatsView(props: {
         <text fg={theme.primary}>
           <b>Cache stats</b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.textMuted }}>{truncate(props.title, HEADER_TITLE_MAX)}</span></b>
         </text>
-        <text fg={theme.textMuted}>{props.models.length + props.subs.length > 12 ? "↑/↓ · esc" : "esc"}</text>
+        <text fg={theme.textMuted}>{props.models.length + props.subs.length > SCROLL_HINT_MIN ? "↑/↓ · esc" : "esc"}</text>
       </box>
       <text fg={theme.borderSubtle} wrapMode="none">
         {SEPARATOR}
@@ -569,7 +562,7 @@ function CacheStatsView(props: {
         ) : (
           <box flexDirection="column" width="100%" gap={0}>
             <text fg={theme.textMuted} wrapMode="none">
-              <b><span style={{ fg: headColor }}>{hitText(s)}</span></b> <b><span style={{ fg: verdict.color }}>{verdict.word}</span></b> · overall hit · <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls
+              <b><span style={{ fg: head.color }}>{hitText(s)}</span></b> <b><span style={{ fg: head.color }}>{head.word}</span></b> · overall hit · <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls
             </text>
 
             <box height={1} />
