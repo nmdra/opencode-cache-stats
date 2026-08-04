@@ -287,6 +287,10 @@ function tokenTotal(t: Acc): number {
   return t.input + t.cacheRead + t.cacheWrite + t.output + t.reasoning
 }
 
+function pctSuffix(part: number, total: number): string {
+  return total > 0 ? ` (${((100 * part) / total).toFixed(1)}%)` : ""
+}
+
 async function fetchList<T>(
   api: () => Promise<T[] | { data?: T[] }>,
   state: () => T[],
@@ -437,6 +441,25 @@ function SummarySection(props: { theme: Theme; s: Acc; models: number; subagents
   )
 }
 
+function GroupLabel(props: { theme: Theme; title: string }) {
+  return (
+    <text fg={props.theme.text} wrapMode="none">
+      <b>{props.title}</b>
+    </text>
+  )
+}
+
+function TreeRow(props: { theme: Theme; last?: boolean; label: string; value: string; valueColor?: RGBA; suffix?: string }) {
+  return (
+    <text fg={props.theme.textMuted} wrapMode="none">
+      {props.last ? "└─ " : "├─ "}
+      {padEnd(props.label, 16)}
+      <b><span style={{ fg: props.valueColor ?? props.theme.text }}>{padStart(props.value, 8)}</span></b>
+      {props.suffix ? <b><span style={{ fg: props.theme.textMuted }}>{props.suffix}</span></b> : null}
+    </text>
+  )
+}
+
 function ModelsSection(props: { theme: Theme; models: { key: string; acc: Acc }[]; cell: number }) {
   const theme = props.theme
   return (
@@ -464,25 +487,47 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
   const theme = props.theme
   const s = props.s
   const subWord = props.subagents === 1 ? "subagent" : "subagents"
+  const inDenom = s.input + s.cacheRead
+  const effH = s.calls > 0 ? (100 * s.callsWithCacheRead) / s.calls : -1
+  const effColor = hitStyle(theme, effH).color
+  const lastHit = s.lastInput + s.lastCacheRead > 0 ? (100 * s.lastCacheRead) / (s.lastInput + s.lastCacheRead) : -1
   return (
     <>
       <SectionHeader theme={theme} title="Totals" count={`main + ${String(props.subagents)} ${subWord}`} />
       <box flexDirection="column" gap={0} paddingLeft={2}>
+        <GroupLabel theme={theme} title="Tokens" />
+        <TreeRow theme={theme} label="Fresh Input" value={fmt(s.input)} valueColor={theme.syntaxNumber} suffix={pctSuffix(s.input, inDenom)} />
+        <TreeRow theme={theme} label="Cache Read" value={fmt(s.cacheRead)} valueColor={theme.info} suffix={pctSuffix(s.cacheRead, inDenom)} />
+        <TreeRow theme={theme} label="Output" value={fmt(s.output)} valueColor={theme.syntaxNumber} />
+        <TreeRow theme={theme} last label="Reasoning" value={fmt(s.reasoning)} valueColor={theme.syntaxNumber} />
+        <GroupLabel theme={theme} title="Calls" />
+        <TreeRow theme={theme} label="Total" value={String(s.calls)} />
+        <TreeRow theme={theme} label="Cache Hits" value={String(s.callsWithCacheRead)} suffix={pctSuffix(s.callsWithCacheRead, s.calls)} />
+        <TreeRow theme={theme} label="Cache Misses" value={String(s.calls - s.callsWithCacheRead)} />
         <text fg={theme.textMuted} wrapMode="none">
-          fresh input <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.input)}</span></b> · output <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.output)}</span></b> · reasoning <b><span style={{ fg: theme.syntaxNumber }}>{fmt(s.reasoning)}</span></b>
+          └─ {padEnd("Efficiency", 16)} <HitBar theme={theme} pct={effH} width={BAR_WIDTH} />{" "}
+          <b><span style={{ fg: effColor }}>{fmtHit(effH)}</span></b>
         </text>
-        <text fg={theme.textMuted} wrapMode="none">
-          cache read <b><span style={{ fg: theme.info }}>{fmt(s.cacheRead)}</span></b> · cache write <b><span style={{ fg: theme.warning }}>{fmt(s.cacheWrite)}</span></b> · cost <b><span style={{ fg: theme.text }}>{fmtCost(s.cost)}</span></b>
-        </text>
+        <GroupLabel theme={theme} title="Cost" />
+        <TreeRow theme={theme} label="Total Cost" value={fmtCost(s.cost)} />
+        <TreeRow theme={theme} last label="Cache Writes" value={fmt(s.cacheWrite)} valueColor={theme.warning} />
         {s.calls > 0 ? (
-          <text fg={theme.textMuted} wrapMode="none">
-            <b><span style={{ fg: s.callsWithCacheRead === s.calls ? theme.success : theme.text }}>{String(s.callsWithCacheRead)}</span></b> of <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls read from cache
-          </text>
+          <>
+            <GroupLabel theme={theme} title="Avg per Call" />
+            <TreeRow theme={theme} label="Fresh Input" value={fmt(s.input / s.calls)} valueColor={theme.syntaxNumber} />
+            <TreeRow theme={theme} label="Cache Read" value={fmt(s.cacheRead / s.calls)} valueColor={theme.info} />
+            <TreeRow theme={theme} label="Output" value={fmt(s.output / s.calls)} valueColor={theme.syntaxNumber} />
+            <TreeRow theme={theme} last label="Cost" value={fmtCost4(s.cost / s.calls)} />
+          </>
         ) : null}
         {s.lastInput + s.lastCacheRead > 0 ? (
-          <text fg={theme.textMuted} wrapMode="none">
-            <b><span style={{ fg: theme.accent }}>most recent request</span></b> · <b><span style={{ fg: theme.text }}>{fmt(s.lastInput + s.lastCacheRead)}</span></b> tokens · <b><span style={{ fg: theme.info }}>{fmt(s.lastCacheRead)}</span></b> cache
-          </text>
+          <>
+            <GroupLabel theme={theme} title="Last Request" />
+            <TreeRow theme={theme} label="Fresh Input" value={fmt(s.lastInput)} valueColor={theme.syntaxNumber} />
+            <TreeRow theme={theme} label="Cache Read" value={fmt(s.lastCacheRead)} valueColor={theme.info} />
+            <TreeRow theme={theme} label="Output" value={fmt(s.lastOutput)} valueColor={theme.syntaxNumber} />
+            <TreeRow theme={theme} last label="Hit Rate" value={fmtHit(lastHit)} valueColor={hitStyle(theme, lastHit).color} />
+          </>
         ) : null}
         <text fg={theme.textMuted} wrapMode="none">
           totals are cumulative over all calls
