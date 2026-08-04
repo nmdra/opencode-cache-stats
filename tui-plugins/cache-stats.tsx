@@ -686,7 +686,7 @@ function CacheStatsView(props: {
       </scrollbox>
 
       <text fg={theme.borderSubtle} wrapMode="none">
-        CH Levels<b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.success }}>● ≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>● {HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>● {HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>● &lt;{HIT_FAIR}%</span></b>
+        CH Levels<b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.success }}>●</span></b> <b><span style={{ fg: theme.textMuted }}>≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>●</span></b> <b><span style={{ fg: theme.textMuted }}>{HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>●</span></b> <b><span style={{ fg: theme.textMuted }}>{HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>●</span></b> <b><span style={{ fg: theme.textMuted }}>&lt;{HIT_FAIR}%</span></b>
       </text>
     </box>
   )
