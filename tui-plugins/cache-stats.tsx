@@ -446,10 +446,10 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
             <b><span style={{ fg: theme.accent }}>most recent request</span></b> · <b><span style={{ fg: theme.text }}>{fmt(s.lastInput + s.lastCacheRead)}</span></b> tokens · <b><span style={{ fg: theme.info }}>{fmt(s.lastCacheRead)}</span></b> cache
           </text>
         ) : null}
+        <text fg={theme.textMuted} wrapMode="none">
+          totals are cumulative over all calls
+        </text>
       </box>
-      <text fg={theme.textMuted} wrapMode="none">
-        totals are cumulative over all calls
-      </text>
     </>
   )
 }
@@ -527,7 +527,7 @@ function CacheStatsView(props: {
     <box flexDirection="column" width={PANEL_WIDTH} paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={0}>
       <box flexDirection="row" width="100%" justifyContent="space-between">
         <text fg={theme.primary}>
-          <b>Cache stats</b> <b><span style={{ fg: theme.textMuted }}>{truncate(props.title, HEADER_TITLE_MAX)}</span></b>
+          <b>Cache stats</b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.textMuted }}>{truncate(props.title, HEADER_TITLE_MAX)}</span></b>
         </text>
         <text fg={theme.textMuted}>{props.models.length + props.subs.length > 12 ? "↑/↓ · esc" : "esc"}</text>
       </box>
@@ -572,6 +572,9 @@ function CacheStatsView(props: {
         )}
       </scrollbox>
 
+      <text fg={theme.borderSubtle} wrapMode="none">
+        Cache Hit Levels
+      </text>
       <text fg={theme.borderSubtle} wrapMode="none">
         <b><span style={{ fg: theme.success }}>● ≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>● {HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>● {HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>● &lt;{HIT_FAIR}%</span></b>
       </text>
