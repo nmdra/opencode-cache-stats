@@ -1,8 +1,8 @@
 # cache-stats
 
-Very Simple opencode TUI plugin that shows prompt-cache hit rate in a popup dialog.
+`cache-stats` is a TUI plugin for [opencode](https://opencode.ai). A TUI is a text user interface. The plugin shows the prompt-cache hit rate of the active session in a popup dialog.
 
-Open it with the `/cache-stats` command (or the `cache-stats.show` command) while inside a session.
+Run the `/cache-stats` command (or the `cache-stats.show` command) inside a session to open the dialog.
 
 | Summary and models | Totals breakdown | Subagents |
 |:---:|:---:|:---:|
@@ -10,23 +10,26 @@ Open it with the `/cache-stats` command (or the `cache-stats.show` command) whil
 
 ## What it shows
 
-- Overall cache hit % for the active session with a color-coded hit bar and verdict (`Excellent` / `Good` / `Fair` / `Poor`)
-- A session summary: total calls, model and subagent counts, total tokens, total cost
-- Per-model breakdown with hit bars, hit %, and token totals
-- Grouped totals (tokens, calls, cost) with percentages, averages per call, and the last request
-- Subagent list with per-subagent hit rates and the model each one used
+The dialog shows:
 
-Cache hit rate is computed as:
+- The overall cache hit percentage of the active session. A hit bar and a verdict word (Excellent, Good, Fair, or Poor) show the level.
+- A session summary: total calls, model count, subagent count, total tokens, and total cost.
+- A per-model breakdown with hit bars, hit percentages, and token totals.
+- Grouped totals for tokens, calls, and cost. The totals include percentages, averages per call, and the last request.
+- A subagent list with the hit rate of each subagent and the model that each subagent used.
+
+The plugin computes the cache hit rate with this formula:
 
 ```
 hit = cache read / (input + cache read)
 ```
 
-Cache write is a one-time priming cost and is excluded from the hit ratio. The plugin also reports how many API calls read from the cache.
+A cache write is a one-time priming cost. It is excluded from the hit ratio. The plugin also reports the number of API calls that read from the cache.
 
 ## Install
 
-Copy the plugin into your opencode config and register it in `~/.config/opencode/tui.json`:
+1. Copy the plugin into `~/.config/opencode/tui-plugins/`.
+2. Register the plugin in `~/.config/opencode/tui.json`:
 
 ```json
 {
@@ -35,9 +38,9 @@ Copy the plugin into your opencode config and register it in `~/.config/opencode
 }
 ```
 
-A copy of `tui.json` is kept as `tui.json.example` in this repo.
+The repo keeps a copy of `tui.json` as `tui.json.example`.
 
-Restart opencode after changing `tui.json`, then run `/cache-stats` inside a session.
+After you change `tui.json`, restart [opencode](https://opencode.ai). Then run the `/cache-stats` command inside a session.
 
 ## Files
 
