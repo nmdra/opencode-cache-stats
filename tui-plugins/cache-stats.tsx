@@ -162,6 +162,10 @@ function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s
 }
 
+function sanitize(s: string): string {
+  return s.replace(/[\u0000-\u001f\u007f]/g, "")
+}
+
 function short(s: string): string {
   const i = s.indexOf("/")
   return i >= 0 ? s.slice(i + 1) : s
@@ -234,11 +238,6 @@ function accCall(acc: Acc, call: Call): void {
   acc.lastCacheWrite = cacheWrite
 }
 
-function accMsg(acc: Acc, m: Msg, nm: NormalizedMsg): void {
-  for (const call of collectCalls(m, nm)) accCall(acc, call)
-  acc.count += 1
-}
-
 function mergeAcc(dst: Acc, src: Acc): void {
   dst.input += src.input
   dst.output += src.output
@@ -262,9 +261,9 @@ function mergeModel(dst: Map<string, Acc>, src: Map<string, Acc>): void {
   }
 }
 
-function modelKey(nm: NormalizedMsg): string {
-  const p = nm.providerID ?? "?"
-  const q = nm.modelID ?? "?"
+function keyFor(model: Part["model"] | undefined, nm: NormalizedMsg): string {
+  const p = model?.providerID ?? nm.providerID ?? "?"
+  const q = model?.modelID ?? model?.id ?? nm.modelID ?? "?"
   return `${p}/${q}`
 }
 
@@ -341,13 +340,16 @@ async function collect(
     if (!m) continue
     const nm = normalizeMsg(m)
     if (nm.role !== "assistant") continue
-    const key = modelKey(nm)
-    let p = perModel.get(key)
-    if (!p) {
-      p = newAcc()
-      perModel.set(key, p)
+    for (const call of collectCalls(m, nm)) {
+      const key = keyFor(call.model, nm)
+      let p = perModel.get(key)
+      if (!p) {
+        p = newAcc()
+        perModel.set(key, p)
+      }
+      accCall(p, call)
     }
-    accMsg(p, m, nm)
+    acc.count += 1
   }
   for (const p of perModel.values()) mergeAcc(acc, p)
 
@@ -367,7 +369,7 @@ async function collect(
     subagents += 1 + sub.subagents
     subs.push({
       id: cid,
-      name: agentName(child) || cid,
+      name: sanitize(agentName(child)) || cid,
       hit: hitPct(sub.acc),
       msgs: sub.acc.count,
       calls: sub.acc.calls,
@@ -545,14 +547,25 @@ function CacheStatsView(props: {
         }}
       >
         {s.calls === 0 ? (
-          <box flexDirection="column" width="100%" gap={0} paddingTop={2} paddingBottom={2}>
-            <text fg={theme.textMuted} wrapMode="none">
-              No cache stats data for <b><span style={{ fg: theme.text }}>{truncate(props.title, EMPTY_TITLE_MAX)}</span></b> yet.
-            </text>
-            <text fg={theme.textMuted} wrapMode="none">
-              Run a few turns in the session, then open again.
-            </text>
-          </box>
+          s.count > 0 ? (
+            <box flexDirection="column" width="100%" gap={0} paddingTop={2} paddingBottom={2}>
+              <text fg={theme.textMuted} wrapMode="none">
+                No token data for <b><span style={{ fg: theme.text }}>{truncate(props.title, EMPTY_TITLE_MAX)}</span></b> yet.
+              </text>
+              <text fg={theme.textMuted} wrapMode="none">
+                Wait for the session to finish streaming, then open again.
+              </text>
+            </box>
+          ) : (
+            <box flexDirection="column" width="100%" gap={0} paddingTop={2} paddingBottom={2}>
+              <text fg={theme.textMuted} wrapMode="none">
+                No cache stats data for <b><span style={{ fg: theme.text }}>{truncate(props.title, EMPTY_TITLE_MAX)}</span></b> yet.
+              </text>
+              <text fg={theme.textMuted} wrapMode="none">
+                Run a few turns in the session, then open again.
+              </text>
+            </box>
+          )
         ) : (
           <box flexDirection="column" width="100%" gap={0}>
             <text fg={theme.textMuted} wrapMode="none">
@@ -593,12 +606,12 @@ async function showCache(api: TuiPluginApi): Promise<void> {
   let title = "session"
   try {
     const s = api.state.session.get(sessionID)
-    title = s?.title || "session"
+    title = sanitize(s?.title || "session")
   } catch {}
 
   const { acc, subagents, perModel, subs } = await collect(api.client, api.state, sessionID, new Set())
 
-  const sorted = [...perModel.entries()].sort((a, b) => b[1].count - a[1].count)
+  const sorted = [...perModel.entries()].sort((a, b) => b[1].calls - a[1].calls)
 
   api.ui.dialog.setSize("medium")
   api.ui.dialog.replace(() => (
