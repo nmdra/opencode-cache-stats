@@ -4,6 +4,16 @@
 
 Run the `/cache-stats` command (or the `cache-stats.show` command) inside a session to open the dialog.
 
+## Features
+
+- Shows the cache hit rate of the active session with a hit bar and a verdict word.
+- Shows totals for tokens, calls, and cost.
+- Groups the totals by model and by subagent.
+- Shows the hit rate of each model and each subagent.
+- Shows averages per call and the last request.
+- Colors the rates by level: Excellent, Good, Fair, or Poor.
+- Scrolls with the arrow keys and the page keys.
+
 | Summary and models | Totals breakdown | Subagents |
 |:---:|:---:|:---:|
 | ![Session summary and models](assets/preview-summary.jpeg) | ![Grouped totals](assets/preview-totals.jpeg) | ![Subagent list](assets/preview-subagents.jpeg) |
