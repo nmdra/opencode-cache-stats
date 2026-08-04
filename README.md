@@ -9,10 +9,10 @@ Open it with the `/cache-stats` command (or the `cache-stats.show` command) whil
 ## What it shows
 
 - Overall cache hit % for the active session with a color-coded verdict (`Excellent` / `Good` / `Fair` / `Poor`)
-- Per-model breakdown with hit bars, hit %, and cached-call counts
-- Totals across the main session including its subagents
-- Subagent list with individual hit rates
-- The most recent request's context size for comparison
+- A session summary: hit bar, total calls, model and subagent counts, total tokens, total cost
+- Per-model breakdown with hit bars, hit %, and token totals
+- Grouped totals (tokens, calls, cost) with percentages, averages per call, and the last request
+- Subagent list with per-subagent hit rates and the model each one used
 
 Cache hit rate is computed as:
 

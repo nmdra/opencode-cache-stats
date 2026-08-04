@@ -520,7 +520,7 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
         <TreeRow theme={theme} label="Cache Hits" value={String(s.callsWithCacheRead)} suffix={pctSuffix(s.callsWithCacheRead, s.calls)} />
         <TreeRow theme={theme} label="Cache Misses" value={String(s.calls - s.callsWithCacheRead)} />
         <text fg={theme.textMuted} wrapMode="none">
-          └─ {padEnd("Efficiency", 16)} <HitBar theme={theme} pct={effH} width={BAR_WIDTH} />{" "}
+          └─ {padEnd("Cache Efficiency", 16)} <HitBar theme={theme} pct={effH} width={BAR_WIDTH} />{" "}
           <b><span style={{ fg: effColor }}>{fmtHit(effH)}</span></b>
         </text>
         <GroupLabel theme={theme} title="Cost" />
@@ -659,10 +659,10 @@ function CacheStatsView(props: {
           ) : (
             <box flexDirection="column" width="100%" gap={0} paddingTop={2} paddingBottom={2}>
               <text fg={theme.textMuted} wrapMode="none">
-                No cache stats data for <b><span style={{ fg: theme.text }}>{truncate(props.title, EMPTY_TITLE_MAX)}</span></b> yet.
+                No cache statistics available for this session.
               </text>
               <text fg={theme.textMuted} wrapMode="none">
-                Run a few turns in the session, then open again.
+                Run at least one assistant request to generate cache metrics.
               </text>
             </box>
           )
