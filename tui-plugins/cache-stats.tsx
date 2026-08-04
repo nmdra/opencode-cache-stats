@@ -76,7 +76,6 @@ const EMPTY_TITLE_MAX = 40
 const SUB_NAME_MAX = 18
 const SUB_ID_MAX = 8
 const SUB_FALLBACK_MAX = 20
-const SCROLL_HINT_MIN = 12
 const PAGE_STEP = 10
 const SEPARATOR = "─".repeat(31)
 
@@ -280,6 +279,14 @@ function fmtCost(n: number): string {
   return n === 0 ? "$0" : `$${n.toFixed(2)}`
 }
 
+function fmtCost4(n: number): string {
+  return `$${n.toFixed(4)}`
+}
+
+function tokenTotal(t: Acc): number {
+  return t.input + t.cacheRead + t.cacheWrite + t.output + t.reasoning
+}
+
 async function fetchList<T>(
   api: () => Promise<T[] | { data?: T[] }>,
   state: () => T[],
@@ -383,14 +390,50 @@ async function collect(
   return { acc, subagents, perModel, subs }
 }
 
-function SectionHeader(props: { theme: Theme; title: string; count: string }) {
+function SectionHeader(props: { theme: Theme; title: string; count?: string }) {
   return (
     <box flexDirection="row" gap={1}>
       <text fg={props.theme.accent}>│</text>
       <text fg={props.theme.secondary}>
-        <b>{props.title}</b> <b><span style={{ fg: props.theme.textMuted }}>· {props.count}</span></b>
+        <b>{props.title}</b>{" "}
+        {props.count !== undefined ? (
+          <b><span style={{ fg: props.theme.textMuted }}>· {props.count}</span></b>
+        ) : null}
       </text>
     </box>
+  )
+}
+
+function SummarySection(props: { theme: Theme; s: Acc; models: number; subagents: number }) {
+  const theme = props.theme
+  const s = props.s
+  const h = hitPct(s)
+  const hs = hitStyle(theme, h)
+  return (
+    <>
+      <SectionHeader theme={theme} title="Session Summary" />
+      <box flexDirection="column" gap={0} paddingLeft={2}>
+        <text fg={theme.textMuted} wrapMode="none">
+          {padEnd("Overall Hit", 16)} <b><span style={{ fg: hs.color }}>{padStart(fmtHit(h), 6)}</span></b>{" "}
+          <HitBar theme={theme} pct={h} width={BAR_WIDTH} />
+        </text>
+        <text fg={theme.textMuted} wrapMode="none">
+          {padEnd("Total Calls", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(s.calls), 7)}</span></b>
+        </text>
+        <text fg={theme.textMuted} wrapMode="none">
+          {padEnd("Models", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(props.models), 7)}</span></b>
+        </text>
+        <text fg={theme.textMuted} wrapMode="none">
+          {padEnd("Subagents", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(props.subagents), 7)}</span></b>
+        </text>
+        <text fg={theme.textMuted} wrapMode="none">
+          {padEnd("Total Tokens", 16)} <b><span style={{ fg: theme.syntaxNumber }}>{padStart(fmt(tokenTotal(s)), 7)}</span></b>
+        </text>
+        <text fg={theme.textMuted} wrapMode="none">
+          {padEnd("Total Cost", 16)} <b><span style={{ fg: theme.text }}>{padStart(fmtCost(s.cost), 7)}</span></b>
+        </text>
+      </box>
+    </>
   )
 }
 
@@ -530,7 +573,7 @@ function CacheStatsView(props: {
         <text fg={theme.primary}>
           <b>Cache stats</b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.textMuted }}>{truncate(props.title, HEADER_TITLE_MAX)}</span></b>
         </text>
-        <text fg={theme.textMuted}>{props.models.length + props.subs.length > SCROLL_HINT_MIN ? "↑/↓ · esc" : "esc"}</text>
+        <text fg={theme.textMuted}>{s.calls > 0 ? "↑/↓ · esc" : "esc"}</text>
       </box>
       <text fg={theme.borderSubtle} wrapMode="none">
         {SEPARATOR}
@@ -568,8 +611,12 @@ function CacheStatsView(props: {
         ) : (
           <box flexDirection="column" width="100%" gap={0}>
             <text fg={theme.textMuted} wrapMode="none">
-              <b><span style={{ fg: head.color }}>{hitText(s)}</span></b> <b><span style={{ fg: head.color }}>{head.word}</span></b> · overall hit · <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls
+              <b><span style={{ fg: head.color }}>{hitText(s)}</span></b> <b><span style={{ fg: head.color }}>{head.word}</span></b> · overall hit
             </text>
+
+            <box height={1} />
+
+            <SummarySection theme={theme} s={s} models={props.models.length} subagents={props.subagents} />
 
             <box height={1} />
 
