@@ -311,8 +311,9 @@ async function collect(
   state: TuiPluginApi["state"],
   sessionID: string,
   visited: Set<string>,
+  signal: AbortSignal,
 ): Promise<Collected> {
-  if (visited.has(sessionID)) return { acc: newAcc(), subagents: 0, perModel: new Map(), subs: [] }
+  if (visited.has(sessionID) || signal.aborted) return { acc: newAcc(), subagents: 0, perModel: new Map(), subs: [] }
   visited.add(sessionID)
 
   const [messages, children] = await Promise.all([
@@ -331,7 +332,7 @@ async function collect(
   const acc = newAcc()
   const perModel = new Map<string, Acc>()
   for (const m of messages) {
-    if (!m) continue
+    if (!m || signal.aborted) continue
     const nm = normalizeMsg(m)
     if (nm.role !== "assistant") continue
     for (const call of collectCalls(m, nm)) {
@@ -347,18 +348,20 @@ async function collect(
   }
   for (const p of perModel.values()) mergeAcc(acc, p)
 
+  if (signal.aborted) return { acc, subagents: 0, perModel, subs: [] }
+
   let subagents = 0
   const subs: Sub[] = []
   const results = await Promise.all(
     children.map(async (child) => {
       const cid = child?.id ?? ""
       if (!cid) return null
-      const sub = await collect(client, state, cid, visited)
+      const sub = await collect(client, state, cid, visited, signal)
       return { child, cid, sub }
     }),
   )
   for (const r of results) {
-    if (!r) continue
+    if (!r || signal.aborted) continue
     const { child, cid, sub } = r
     subagents += 1 + sub.subagents
     subs.push({
@@ -588,35 +591,46 @@ function CacheStatsView(props: {
   )
 }
 
+let showInFlight = false
+
 async function showCache(api: TuiPluginApi): Promise<void> {
-  const route = api.route?.current
-  const sessionID = route?.name === "session" ? route.params?.sessionID : undefined
-  if (!sessionID) {
-    api.ui.toast({ title: "Cache stats", message: "No active session.", variant: "warning" })
-    return
-  }
-
-  let title = "session"
+  if (showInFlight) return
+  showInFlight = true
   try {
-    const s = api.state.session.get(sessionID)
-    title = sanitize(s?.title || "session")
-  } catch {}
+    const route = api.route?.current
+    const sessionID = route?.name === "session" ? route.params?.sessionID : undefined
+    if (!sessionID) {
+      api.ui.toast({ title: "Cache stats", message: "No active session.", variant: "warning" })
+      return
+    }
 
-  const { acc, subagents, perModel, subs } = await collect(api.client, api.state, sessionID, new Set())
+    let title = "session"
+    try {
+      const s = api.state.session.get(sessionID)
+      title = sanitize(s?.title || "session")
+    } catch (err) {
+      console.error("[cache-stats] session:", err)
+    }
 
-  const sorted = [...perModel.entries()].sort((a, b) => b[1].calls - a[1].calls)
+    const { acc, subagents, perModel, subs } = await collect(api.client, api.state, sessionID, new Set(), api.lifecycle.signal)
+    if (api.lifecycle.signal.aborted) return
 
-  api.ui.dialog.setSize("medium")
-  api.ui.dialog.replace(() => (
-    <CacheStatsView
-      theme={api.theme.current}
-      title={title}
-      acc={acc}
-      subagents={subagents}
-      subs={subs}
-      models={sorted.map(([key, m]) => ({ key, acc: m }))}
-    />
-  ))
+    const sorted = [...perModel.entries()].sort((a, b) => b[1].calls - a[1].calls)
+
+    api.ui.dialog.setSize("medium")
+    api.ui.dialog.replace(() => (
+      <CacheStatsView
+        theme={api.theme.current}
+        title={title}
+        acc={acc}
+        subagents={subagents}
+        subs={subs}
+        models={sorted.map(([key, m]) => ({ key, acc: m }))}
+      />
+    ))
+  } finally {
+    showInFlight = false
+  }
 }
 
 export const tui: TuiPlugin = async (api) => {
