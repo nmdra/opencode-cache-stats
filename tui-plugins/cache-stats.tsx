@@ -72,12 +72,16 @@ const PANEL_WIDTH = 58
 const SCROLL_HEIGHT = 14
 const BAR_WIDTH = 10
 const CELL_MIN = 18
-const CELL_MAX = 22
+const CELL_MAX = 32
 const HEADER_TITLE_MAX = 30
 const EMPTY_TITLE_MAX = 40
-const SUB_NAME_COL = 10
-const SUB_ID_COL = 9
+const SUB_NAME_COL = 12
+const SUB_ID_COL = 12
+const MODEL_COL = 21
+const HIT_COL = 7
 const PAGE_STEP = 10
+const VAL_COL = 8
+const COST_COL = 8
 const SEPARATOR = "─".repeat(31)
 
 function hitPct(t: Acc): number {
@@ -163,6 +167,11 @@ function sanitize(s: string): string {
 function short(s: string): string {
   const i = s.indexOf("/")
   return i >= 0 ? s.slice(i + 1) : s
+}
+
+function providerOf(key: string): string {
+  const p = key.split("/")[0]
+  return p && p !== "?" ? p : ""
 }
 
 type Tokens = { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } }
@@ -295,6 +304,10 @@ function fmtCost(n: number): string {
 
 function fmtCost4(n: number): string {
   return `~$${n.toFixed(4)}`
+}
+
+function fmtCostPadded(n: number): string {
+  return padStart(fmtCost(n), COST_COL)
 }
 
 function tokenTotal(t: Acc): number {
@@ -433,19 +446,19 @@ function SummarySection(props: { theme: Theme; s: Acc; models: number; subagents
       <SectionHeader theme={theme} title="Session Summary" />
       <box flexDirection="column" gap={0} paddingLeft={2}>
         <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Total Calls", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(s.calls), 7)}</span></b>
+          {padEnd("Total Calls", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(s.calls), VAL_COL)}</span></b>
         </text>
         <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Models", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(props.models), 7)}</span></b>
+          {padEnd("Models", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(props.models), VAL_COL)}</span></b>
         </text>
         <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Subagents", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(props.subagents), 7)}</span></b>
+          {padEnd("Subagents", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(props.subagents), VAL_COL)}</span></b>
         </text>
         <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Total Tokens", 16)} <b><span style={{ fg: theme.syntaxNumber }}>{padStart(fmt(tokenTotal(s)), 7)}</span></b>
+          {padEnd("Total Tokens", 16)} <b><span style={{ fg: theme.syntaxNumber }}>{padStart(fmt(tokenTotal(s)), VAL_COL)}</span></b>
         </text>
         <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Total Cost", 16)} <b><span style={{ fg: theme.text }}>{padStart(fmtCost(s.cost), 8)}</span></b>
+          {padEnd("Total Cost", 16)} <b><span style={{ fg: theme.text }}>{fmtCostPadded(s.cost)}</span></b>
         </text>
       </box>
     </>
@@ -482,11 +495,20 @@ function ModelsSection(props: { theme: Theme; models: { key: string; acc: Acc }[
           const mh = hitPct(m)
           const mc = hitStyle(theme, mh).color
           const name = truncate(short(model.key), props.cell)
+          const provider = providerOf(model.key)
           return (
-            <text fg={theme.textMuted} wrapMode="none">
-              {padEnd(name, props.cell)}  <b><span style={{ fg: mc }}>{padStart(fmtHit(mh), 6)}</span></b>  <HitBar theme={theme} pct={mh} width={BAR_WIDTH} />{" "}
-              <b><span style={{ fg: theme.textMuted }}>{padStart(fmt(tokenTotal(m)), 8)}</span></b>
-            </text>
+            <box flexDirection="column" gap={0}>
+              <text fg={theme.textMuted} wrapMode="none">
+                <b><span style={{ fg: theme.text }}>{padEnd(name, props.cell)}</span></b>{"  "}
+                <b><span style={{ fg: mc }}>{padStart(fmtHit(mh), 6)}</span></b>{"  "}
+                <HitBar theme={theme} pct={mh} width={BAR_WIDTH} />
+              </text>
+              {mh >= 0 && provider ? (
+                <text fg={theme.textMuted} wrapMode="none">
+                  └─ {padEnd(truncate(provider, 11), 11)} {padStart(fmt(tokenTotal(m)), 6)}   {fmtCostPadded(m.cost)}
+                </text>
+              ) : null}
+            </box>
           )
         })}
       </box>
@@ -520,7 +542,7 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
           <HitBar theme={theme} pct={effH} width={BAR_WIDTH} />
         </text>
         <GroupLabel theme={theme} title="Cost" />
-        <TreeRow theme={theme} label="Total Cost" value={fmtCost(s.cost)} />
+        <TreeRow theme={theme} label="Total Cost" value={fmtCostPadded(s.cost)} />
         <TreeRow theme={theme} last label="Cache Writes" value={fmt(s.cacheWrite)} valueColor={theme.warning} />
         {s.calls > 0 ? (
           <>
@@ -540,7 +562,7 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
             <TreeRow theme={theme} last label="Hit Rate" value={fmtHit(lastHit)} valueColor={hitStyle(theme, lastHit).color} />
           </>
         ) : null}
-        <text fg={theme.textMuted} wrapMode="none">
+        <text fg={theme.textMuted} wrapMode="none" style={{ attributes: TextAttributes.ITALIC }}>
           totals are cumulative over all calls
         </text>
       </box>
@@ -563,15 +585,14 @@ function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
               <text fg={theme.textMuted} wrapMode="none">
                 <b><span style={{ fg: theme.text }}>{padEnd(named ? truncate(sub.name, SUB_NAME_COL) : truncate(sub.id, SUB_NAME_COL), SUB_NAME_COL)}</span></b>{" "}
                 {named ? <b><span style={{ fg: theme.textMuted }}>{padEnd(truncate(sub.id, SUB_ID_COL), SUB_ID_COL)}</span></b> : null}
-                <b><span style={{ fg: hitStyle(theme, sub.hit).color }}>{padStart(fmtHit(sub.hit), 6)}</span></b>{" "}
-                <b><span style={{ fg: theme.textMuted }}>{padEnd(`${String(sub.msgs)} msg${sub.msgs === 1 ? "" : "s"}`, 7)}</span></b>
+                <b><span style={{ fg: hitStyle(theme, sub.hit).color }}>{padStart(fmtHit(sub.hit), HIT_COL)}</span></b>
                 {sub.calls > 0 ? (
-                  <b><span style={{ fg: theme.textMuted }}>{padStart(`${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit`, 9)}</span></b>
+                  <b><span style={{ fg: theme.textMuted }}>{" "}{padStart(`${String(sub.callsWithCacheRead)}/${String(sub.calls)}`, 5)} hit</span></b>
                 ) : null}
               </text>
               {sub.model ? (
                 <text fg={theme.textMuted} wrapMode="none">
-                  └─ {truncate(`${sub.model} · ${fmt(sub.tokens)} tokens`, 48)}
+                  └─ {padEnd(truncate(short(sub.model), MODEL_COL), MODEL_COL)} {" "}{padStart(fmt(sub.tokens), HIT_COL)}
                 </text>
               ) : null}
             </>
