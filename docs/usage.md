@@ -20,12 +20,12 @@ Press the key `esc`. The dialog closes. The session stays open.
 The dialog has seven sections. A footer shows the color levels at the bottom.
 
 - **The header.** This section shows the title `Cache stats`. The session title follows it. It shows the key `esc` on the right.
-- **The highlight.** This section shows the overall cache rate.
-- **The session summary.** This section shows the overall hit with a bar, the total calls, the model count, the subagent count, the total tokens, and the total cost.
+- **The highlight.** This section shows the overall cache rate with a hit bar.
+- **The session summary.** This section shows the total calls, the model count, the subagent count, the total tokens, and the total cost.
 - **The models.** This section lists the models of the session. Each row shows a hit bar, the hit rate, and the total tokens of the model.
 - **The totals.** This section shows grouped totals for tokens, calls, and cost. It shows averages per call. It shows the last request.
 - **The subagents.** This section lists the subagents of the session. Each subagent has a child row. The child row shows the model of the subagent and its tokens.
-- **The footer.** This shows the label `Cache Hit Levels`. It also shows the color levels with a dot for each level.
+- **The footer.** This shows the color levels with a dot for each level. Below the levels the label `CH Levels` fills the remaining width.
 
 ## The overall rate
 

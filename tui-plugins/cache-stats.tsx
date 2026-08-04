@@ -78,6 +78,7 @@ const SUB_NAME_COL = 10
 const SUB_ID_COL = 9
 const PAGE_STEP = 10
 const SEPARATOR = "─".repeat(31)
+const SEPARATOR_DOTS = "─".repeat(PANEL_WIDTH - 4 - "CH Levels ".length)
 
 function hitPct(t: Acc): number {
   const denom = t.input + t.cacheRead
@@ -427,16 +428,10 @@ function SectionHeader(props: { theme: Theme; title: string; count?: string }) {
 function SummarySection(props: { theme: Theme; s: Acc; models: number; subagents: number }) {
   const theme = props.theme
   const s = props.s
-  const h = hitPct(s)
-  const hs = hitStyle(theme, h)
   return (
     <>
       <SectionHeader theme={theme} title="Session Summary" />
       <box flexDirection="column" gap={0} paddingLeft={2}>
-        <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Overall Hit", 16)} <b><span style={{ fg: hs.color }}>{padStart(fmtHit(h), 6)}</span></b>{" "}
-          <HitBar theme={theme} pct={h} width={BAR_WIDTH} />
-        </text>
         <text fg={theme.textMuted} wrapMode="none">
           {padEnd("Total Calls", 16)} <b><span style={{ fg: theme.text }}>{padStart(String(s.calls), 7)}</span></b>
         </text>
@@ -670,6 +665,7 @@ function CacheStatsView(props: {
         ) : (
           <box flexDirection="column" width="100%" gap={0}>
             <text fg={theme.textMuted} wrapMode="none">
+              <HitBar theme={theme} pct={h} width={BAR_WIDTH} />{" "}
               <b><span style={{ fg: head.color }}>{hitText(s)}</span></b> <b><span style={{ fg: head.color }}>{head.word}</span></b> · overall hit
             </text>
 
@@ -691,10 +687,10 @@ function CacheStatsView(props: {
       </scrollbox>
 
       <text fg={theme.borderSubtle} wrapMode="none">
-        Cache Hit Levels
+        <b><span style={{ fg: theme.success }}>● ≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>● {HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>● {HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>● &lt;{HIT_FAIR}%</span></b>
       </text>
       <text fg={theme.borderSubtle} wrapMode="none">
-        <b><span style={{ fg: theme.success }}>● ≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>● {HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>● {HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>● &lt;{HIT_FAIR}%</span></b>
+        CH Levels {SEPARATOR_DOTS}
       </text>
     </box>
   )
