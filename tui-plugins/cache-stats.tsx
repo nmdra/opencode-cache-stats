@@ -71,7 +71,7 @@ const SCROLL_HEIGHT = 14
 const BAR_WIDTH = 10
 const CELL_MIN = 18
 const CELL_MAX = 22
-const TITLE_MAX = 60
+const HEADER_TITLE_MAX = 30
 const EMPTY_TITLE_MAX = 40
 const SUB_NAME_MAX = 18
 const SUB_ID_MAX = 8
@@ -527,7 +527,7 @@ function CacheStatsView(props: {
     <box flexDirection="column" width={PANEL_WIDTH} paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={0}>
       <box flexDirection="row" width="100%" justifyContent="space-between">
         <text fg={theme.primary}>
-          <b>Cache stats</b>
+          <b>Cache stats</b> <b><span style={{ fg: theme.textMuted }}>{truncate(props.title, HEADER_TITLE_MAX)}</span></b>
         </text>
         <text fg={theme.textMuted}>{props.models.length + props.subs.length > 12 ? "↑/↓ · esc" : "esc"}</text>
       </box>
@@ -558,9 +558,6 @@ function CacheStatsView(props: {
             <text fg={theme.textMuted} wrapMode="none">
               <b><span style={{ fg: headColor }}>{hitText(s)}</span></b> <b><span style={{ fg: verdict.color }}>{verdict.word}</span></b> · overall hit · <b><span style={{ fg: theme.text }}>{String(s.calls)}</span></b> calls
             </text>
-            <text fg={theme.textMuted} wrapMode="none">
-              {truncate(props.title, TITLE_MAX)}
-            </text>
 
             <box height={1} />
 
@@ -575,9 +572,6 @@ function CacheStatsView(props: {
         )}
       </scrollbox>
 
-      <text fg={theme.borderSubtle} wrapMode="none">
-        hit = cache read / (input + cache read)
-      </text>
       <text fg={theme.borderSubtle} wrapMode="none">
         <b><span style={{ fg: theme.success }}>● ≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>● {HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>● {HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>● &lt;{HIT_FAIR}%</span></b>
       </text>
