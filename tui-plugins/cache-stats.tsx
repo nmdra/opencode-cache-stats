@@ -290,11 +290,11 @@ function dominantModel(m: Map<string, Acc>): string | undefined {
 }
 
 function fmtCost(n: number): string {
-  return n === 0 ? "$0" : `$${n.toFixed(2)}`
+  return `~$${n.toFixed(2)}`
 }
 
 function fmtCost4(n: number): string {
-  return `$${n.toFixed(4)}`
+  return `~$${n.toFixed(4)}`
 }
 
 function tokenTotal(t: Acc): number {
@@ -445,7 +445,7 @@ function SummarySection(props: { theme: Theme; s: Acc; models: number; subagents
           {padEnd("Total Tokens", 16)} <b><span style={{ fg: theme.syntaxNumber }}>{padStart(fmt(tokenTotal(s)), 7)}</span></b>
         </text>
         <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Total Cost", 16)} <b><span style={{ fg: theme.text }}>{padStart(fmtCost(s.cost), 7)}</span></b>
+          {padEnd("Total Cost", 16)} <b><span style={{ fg: theme.text }}>{padStart(fmtCost(s.cost), 8)}</span></b>
         </text>
       </box>
     </>
