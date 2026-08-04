@@ -17,14 +17,14 @@ Press the key `esc`. The dialog closes. The session stays open.
 
 ## The sections of the dialog
 
-The dialog has five sections. A footer shows the formula and the color levels at the bottom.
+The dialog has six sections. A footer shows the color levels at the bottom.
 
-- **The header.** This section shows the title `Cache stats`. It shows the key `esc` on the right.
-- **The highlight.** This section shows the overall cache rate. It shows the title of the session below that rate.
+- **The header.** This section shows the title `Cache stats`. The session title follows it. It shows the key `esc` on the right.
+- **The highlight.** This section shows the overall cache rate.
 - **The models.** This section lists the models of the session.
 - **The totals.** This section shows the total token counts. It shows the total cost.
 - **The subagents.** This section lists the subagents of the session.
-- **The footer.** This shows the formula for the cache rate. It also shows the color levels with a dot for each level.
+- **The footer.** This shows the label `Cache Hit Levels`. It also shows the color levels with a dot for each level.
 
 ## The overall rate
 
@@ -36,7 +36,7 @@ A high rate means that many tokens come from the cache. A low rate means that ma
 
 The models section shows one row per model. Each row has a bar. The bar shows how much of the input came from the cache. The filled cells of the bar use the color of the hit level. Next to the bar the row shows the hit rate. When the model has API calls, the row also shows how many of those calls read from the cache, for example `43/65`.
 
-The dialog sorts the models by message count. The model with the most messages is first.
+The dialog sorts the models by call count. The model with the most calls is first.
 
 ## The totals section
 
@@ -55,3 +55,5 @@ The dialog shows all subagents. When there are many, the dialog scrolls. Use the
 ## No data yet
 
 When the session has no assistant messages, the dialog shows a guidance message. It tells you to run a few turns and then open the dialog again.
+
+When the session has messages but no token data yet, the dialog shows a different message. It tells you to wait for the session to finish streaming.

@@ -28,13 +28,14 @@ Copy the plugin into your opencode config and register it in `~/.config/opencode
 
 ```json
 {
+  "$schema": "https://opencode.ai/tui.json",
   "plugin": ["./tui-plugins/cache-stats.tsx"]
 }
 ```
 
 A copy of `tui.json` is kept as `tui.json.example` in this repo.
 
-Then restart opencode and run `/cache-stats` inside a session.
+Restart opencode after changing `tui.json`, then run `/cache-stats` inside a session.
 
 ## Files
 
