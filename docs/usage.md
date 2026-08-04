@@ -25,7 +25,7 @@ The dialog has seven sections. A footer shows the color levels at the bottom.
 - **The models.** This section lists the models of the session. Each row shows a hit bar, the hit rate, and the total tokens of the model.
 - **The totals.** This section shows grouped totals for tokens, calls, and cost. It shows averages per call. It shows the last request.
 - **The subagents.** This section lists the subagents of the session. Each subagent has a child row. The child row shows the model of the subagent and its tokens.
-- **The footer.** This shows the color levels with a dot for each level. Below the levels the label `CH Levels` fills the remaining width.
+- **The footer.** This shows the label `CH Levels` and the color levels with a dot for each level.
 
 ## The overall rate
 

@@ -78,7 +78,6 @@ const SUB_NAME_COL = 10
 const SUB_ID_COL = 9
 const PAGE_STEP = 10
 const SEPARATOR = "─".repeat(31)
-const SEPARATOR_DOTS = "─".repeat(PANEL_WIDTH - 4 - "CH Levels ".length)
 
 function hitPct(t: Acc): number {
   const denom = t.input + t.cacheRead
@@ -687,10 +686,7 @@ function CacheStatsView(props: {
       </scrollbox>
 
       <text fg={theme.borderSubtle} wrapMode="none">
-        <b><span style={{ fg: theme.success }}>● ≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>● {HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>● {HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>● &lt;{HIT_FAIR}%</span></b>
-      </text>
-      <text fg={theme.borderSubtle} wrapMode="none">
-        CH Levels {SEPARATOR_DOTS}
+        CH Levels<b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.success }}>● ≥{HIT_EXCELLENT}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.info }}>● {HIT_GOOD}–{HIT_EXCELLENT - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.warning }}>● {HIT_FAIR}–{HIT_GOOD - 1}%</span></b> <b><span style={{ fg: theme.textMuted }}>·</span></b> <b><span style={{ fg: theme.error }}>● &lt;{HIT_FAIR}%</span></b>
       </text>
     </box>
   )
