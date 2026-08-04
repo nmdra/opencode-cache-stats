@@ -4,11 +4,9 @@ Very Simple opencode TUI plugin that shows prompt-cache hit rate in a popup dial
 
 Open it with the `/cache-stats` command (or the `cache-stats.show` command) while inside a session.
 
-| Preview |
-|:---:|
-| ![Session summary and models](assets/preview-summary.jpeg)<br>*Summary and models* |
-| ![Grouped totals](assets/preview-totals.jpeg)<br>*Totals breakdown* |
-| ![Subagent list](assets/preview-subagents.jpeg)<br>*Subagents* |
+| Summary and models | Totals breakdown | Subagents |
+|:---:|:---:|:---:|
+| ![Session summary and models](assets/preview-summary.jpeg) | ![Grouped totals](assets/preview-totals.jpeg) | ![Subagent list](assets/preview-subagents.jpeg) |
 
 ## What it shows
 
