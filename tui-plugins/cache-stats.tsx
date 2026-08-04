@@ -450,15 +450,8 @@ function ModelsSection(props: { theme: Theme; models: { key: string; acc: Acc }[
           const name = truncate(short(model.key), props.cell)
           return (
             <text fg={theme.textMuted} wrapMode="none">
-              {padEnd(name, props.cell)}  <b><span style={{ fg: mc }}>{padStart(fmtHit(mh), 6)}</span></b>  <HitBar theme={theme} pct={mh} width={BAR_WIDTH} />
-              {m.calls > 0 ? (
-                <b>
-                  <span style={{ fg: m.callsWithCacheRead === m.calls ? theme.success : theme.textMuted }}>
-                    {"  "}
-                    {String(m.callsWithCacheRead)}/{String(m.calls)}
-                  </span>
-                </b>
-              ) : null}
+              {padEnd(name, props.cell)}  <b><span style={{ fg: mc }}>{padStart(fmtHit(mh), 6)}</span></b>  <HitBar theme={theme} pct={mh} width={BAR_WIDTH} />{" "}
+              <b><span style={{ fg: theme.textMuted }}>{padStart(fmt(tokenTotal(m)), 8)}</span></b>
             </text>
           )
         })}
