@@ -315,6 +315,9 @@ async function collect(
 ): Promise<Collected> {
   if (visited.has(sessionID) || signal.aborted) return { acc: newAcc(), subagents: 0, perModel: new Map(), subs: [] }
   visited.add(sessionID)
+  // A child shared by two parents is skipped on its second visit and
+  // appears with zeroed stats; acceptable for real session trees,
+  // where each session has a single parent.
 
   const [messages, children] = await Promise.all([
     fetchList<Msg>(
@@ -633,13 +636,13 @@ async function showCache(api: TuiPluginApi): Promise<void> {
   }
 }
 
-export const tui: TuiPlugin = async (api) => {
+const tui: TuiPlugin = async (api) => {
   api.keymap.registerLayer({
     commands: [
       {
         name: "cache-stats.show",
         title: "Cache stats",
-        category: "System",
+        category: "Plugin",
         namespace: "palette",
         slashName: "cache-stats",
         run: () => {
@@ -650,5 +653,5 @@ export const tui: TuiPlugin = async (api) => {
   })
 }
 
-const plugin: TuiPluginModule = { id: "cache-stats", tui }
+const plugin: TuiPluginModule = { id: "nmdra.cache-stats", tui }
 export default plugin
