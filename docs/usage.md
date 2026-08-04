@@ -37,7 +37,7 @@ A high rate means that many tokens come from the cache. A low rate means that ma
 
 The models section shows one row per model. Each row has a bar. The bar shows how much of the input came from the cache. The filled cells of the bar use the color of the hit level. Next to the bar the row shows the hit rate and the total tokens of the model.
 
-The dialog sorts the models by call count. The model with the most calls is first.
+The dialog sorts the models by cache hit rate. The model with the highest rate is first. If two models have the same rate, the model with the most calls is first.
 
 ## The totals section
 
@@ -50,6 +50,8 @@ The totals add the values of every call in the session. The values grow as the s
 ## The subagents section
 
 The subagents section shows one parent row per subagent. The row shows the subagent name, a short id, its cache rate, its message count, and its cache-hit ratio. A child row below shows the model of the subagent and its total tokens. The model is the model with the most calls. The child row has a muted color.
+
+The dialog sorts the subagents by cache hit rate. The subagent with the highest rate is first.
 
 The dialog shows all subagents. When there are many, the dialog scrolls. Use the `↑` and `↓` keys to scroll.
 

@@ -716,7 +716,8 @@ async function showCache(api: TuiPluginApi): Promise<void> {
     const { acc, subagents, perModel, subs } = await collect(api.client, api.state, sessionID, new Set(), api.lifecycle.signal)
     if (api.lifecycle.signal.aborted) return
 
-    const sorted = [...perModel.entries()].sort((a, b) => b[1].calls - a[1].calls)
+    const sorted = [...perModel.entries()].sort((a, b) => hitPct(b[1]) - hitPct(a[1]) || b[1].calls - a[1].calls)
+    subs.sort((a, b) => b.hit - a.hit || b.calls - a.calls)
 
     api.ui.dialog.setSize("medium")
     api.ui.dialog.replace(() => (

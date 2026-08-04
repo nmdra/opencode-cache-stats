@@ -47,7 +47,7 @@ The plugin excludes cache write from the rate. A cache write is a one-time primi
 
 ## The model list
 
-The plugin groups the messages by model. Each group gives one row. The row order depends on the message count. The model with the most messages is first.
+The plugin groups the messages by model. Each group gives one row. The row order depends on the cache hit rate. The model with the highest rate is first.
 
 ## The data read order
 
