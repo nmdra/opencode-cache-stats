@@ -24,7 +24,7 @@ type Acc = {
   lastCacheWrite: number
 }
 
-type Sub = { id: string; name: string; hit: number; msgs: number; calls: number; callsWithCacheRead: number }
+type Sub = { id: string; name: string; hit: number; msgs: number; calls: number; callsWithCacheRead: number; tokens: number; cost: number; model?: string }
 
 type Collected = {
   acc: Acc
@@ -73,9 +73,8 @@ const CELL_MIN = 18
 const CELL_MAX = 22
 const HEADER_TITLE_MAX = 30
 const EMPTY_TITLE_MAX = 40
-const SUB_NAME_MAX = 18
-const SUB_ID_MAX = 8
-const SUB_FALLBACK_MAX = 20
+const SUB_NAME_COL = 10
+const SUB_ID_COL = 9
 const PAGE_STEP = 10
 const SEPARATOR = "─".repeat(31)
 
@@ -275,6 +274,19 @@ function agentName(child: SessionChild): string {
   return ""
 }
 
+function dominantModel(m: Map<string, Acc>): string | undefined {
+  let best: string | undefined
+  let bestCalls = 0
+  for (const [key, acc] of m) {
+    if (short(key) === "?") continue
+    if (acc.calls > bestCalls) {
+      best = key
+      bestCalls = acc.calls
+    }
+  }
+  return best
+}
+
 function fmtCost(n: number): string {
   return n === 0 ? "$0" : `$${n.toFixed(2)}`
 }
@@ -385,6 +397,9 @@ async function collect(
       msgs: sub.acc.count,
       calls: sub.acc.calls,
       callsWithCacheRead: sub.acc.callsWithCacheRead,
+      tokens: tokenTotal(sub.acc),
+      cost: sub.acc.cost,
+      model: dominantModel(sub.perModel),
     })
     mergeAcc(acc, sub.acc)
     mergeModel(perModel, sub.perModel)
@@ -546,19 +561,24 @@ function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
       <SectionHeader theme={theme} title="Subagents" count={String(props.subs.length)} />
       <box flexDirection="column" gap={0} paddingLeft={2}>
         {props.subs.map((sub) => {
+          const named = sub.name !== sub.id
           return (
-            <text fg={theme.textMuted} wrapMode="none">
-              {sub.name !== sub.id ? (
-                <>
-                  <b><span style={{ fg: theme.text }}>{truncate(sub.name, SUB_NAME_MAX)}</span></b>{" "}
-                  <b><span style={{ fg: theme.textMuted }}>{truncate(sub.id, SUB_ID_MAX)}</span></b>
-                </>
-              ) : (
-                truncate(sub.id, SUB_FALLBACK_MAX)
-              )}{" "}
-              · <b><span style={{ fg: hitStyle(theme, sub.hit).color }}>{fmtHit(sub.hit)}</span></b> · {String(sub.msgs)} msg{sub.msgs === 1 ? "" : "s"}
-              {sub.calls > 0 ? ` · ${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit` : ""}
-            </text>
+            <>
+              <text fg={theme.textMuted} wrapMode="none">
+                <b><span style={{ fg: theme.text }}>{padEnd(named ? truncate(sub.name, SUB_NAME_COL) : truncate(sub.id, SUB_NAME_COL), SUB_NAME_COL)}</span></b>{" "}
+                {named ? <b><span style={{ fg: theme.textMuted }}>{padEnd(truncate(sub.id, SUB_ID_COL), SUB_ID_COL)}</span></b> : null}
+                <b><span style={{ fg: hitStyle(theme, sub.hit).color }}>{padStart(fmtHit(sub.hit), 6)}</span></b>{" "}
+                <b><span style={{ fg: theme.textMuted }}>{padEnd(`${String(sub.msgs)} msg${sub.msgs === 1 ? "" : "s"}`, 7)}</span></b>
+                {sub.calls > 0 ? (
+                  <b><span style={{ fg: theme.textMuted }}>{padStart(`${String(sub.callsWithCacheRead)}/${String(sub.calls)} hit`, 9)}</span></b>
+                ) : null}
+              </text>
+              {sub.model ? (
+                <text fg={theme.textMuted} wrapMode="none">
+                  └─ {truncate(`${sub.model} · ${fmt(sub.tokens)} tokens`, 48)}
+                </text>
+              ) : null}
+            </>
           )
         })}
       </box>
