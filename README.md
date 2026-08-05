@@ -10,7 +10,7 @@ Run the `/cache-stats` command (or the `cache-stats.show` command) inside a sess
 - Shows totals for tokens, calls, and cost.
 - Groups the totals by model and by subagent.
 - Shows the hit rate of each model and each subagent.
-- Shows averages per call and the last request.
+- Shows averages per call.
 - Colors the rates by level: Excellent, Good, Fair, or Poor.
 - Scrolls with the arrow keys and the page keys.
 
@@ -25,7 +25,7 @@ The dialog shows:
 - The overall cache hit percentage of the active session. A hit bar and a verdict word (Excellent, Good, Fair, or Poor) show the level.
 - A session summary: total calls, model count, subagent count, total tokens, and total cost.
 - A per-model breakdown with hit bars, hit percentages, and token totals.
-- Grouped totals for tokens, calls, and cost. The totals include percentages, averages per call, and the last request.
+- Grouped totals for tokens, calls, and cost. The totals include percentages and averages per call.
 - A subagent list with the hit rate of each subagent and the model that each subagent used.
 
 The plugin computes the cache hit rate with this formula:

@@ -21,19 +21,12 @@ type Acc = {
   count: number;
   calls: number;
   callsWithCacheRead: number;
-  callsWithCacheWrite: number;
-  lastInput: number;
-  lastOutput: number;
-  lastReasoning: number;
-  lastCacheRead: number;
-  lastCacheWrite: number;
 };
 
 type Sub = {
   id: string;
   name: string;
   hit: number;
-  msgs: number;
   calls: number;
   callsWithCacheRead: number;
   tokens: number;
@@ -65,7 +58,7 @@ type NormalizedMsg = {
   cost: number;
   providerID?: string;
   modelID?: string;
-  model?: Part["model"];
+  model?: ModelRef;
 };
 
 type ScrollHandle = {
@@ -89,6 +82,18 @@ const HIT_EXCELLENT = 90;
 const HIT_GOOD = 70;
 const HIT_FAIR = 40;
 
+type HitLevel = {
+  range: string;
+  color: (theme: Theme) => RGBA;
+};
+
+const HIT_LEVELS: HitLevel[] = [
+  { range: `≥${HIT_EXCELLENT}%`, color: (t) => t.success },
+  { range: `${HIT_GOOD}–${HIT_EXCELLENT - 1}%`, color: (t) => t.info },
+  { range: `${HIT_FAIR}–${HIT_GOOD - 1}%`, color: (t) => t.warning },
+  { range: `<${HIT_FAIR}%`, color: (t) => t.error },
+];
+
 const PANEL_WIDTH = 58;
 const SCROLL_HEIGHT = 14;
 const BAR_WIDTH = 10;
@@ -100,6 +105,13 @@ const SUB_NAME_COL = 12;
 const SUB_ID_COL = 17;
 const MODEL_COL = 21;
 const HIT_COL = 8;
+const TOKEN_COL = 8;
+const MODEL_HIT_COL = 5;
+const MODEL_TOKEN_COL = 6;
+const PROVIDER_COL = 11;
+const RATIO_COL = 7;
+const LABEL_COL = 16;
+const SUMMARY_LABEL_COL = 13;
 const PAGE_STEP = 10;
 const VAL_COL = 8;
 const COST_COL = 8;
@@ -112,10 +124,6 @@ function hitPct(t: Acc): number {
 
 function fmtHit(h: number): string {
   return h < 0 ? "n/a" : `${h.toFixed(1)}%`;
-}
-
-function hitText(t: Acc): string {
-  return fmtHit(hitPct(t));
 }
 
 function hitStyle(theme: Theme, h: number): { color: RGBA; word: string } {
@@ -169,24 +177,11 @@ function newAcc(): Acc {
     count: 0,
     calls: 0,
     callsWithCacheRead: 0,
-    callsWithCacheWrite: 0,
-    lastInput: 0,
-    lastOutput: 0,
-    lastReasoning: 0,
-    lastCacheRead: 0,
-    lastCacheWrite: 0,
   };
 }
 
-function padStart(s: string, n: number): string {
-  return s.length >= n ? s : " ".repeat(n - s.length) + s;
-}
-
-function padEnd(s: string, n: number): string {
-  return s.length >= n ? s : s + " ".repeat(n - s.length);
-}
-
 function truncate(s: string, n: number): string {
+  if (n <= 1) return "…";
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
@@ -217,11 +212,13 @@ type Tokens = {
   cache?: { read?: number; write?: number };
 };
 
+type ModelRef = { providerID?: string; modelID?: string; id?: string };
+
 type Part = {
   type?: string;
   tokens?: Tokens;
   cost?: number;
-  model?: { providerID?: string; modelID?: string; id?: string };
+  model?: ModelRef;
 };
 
 type Msg = {
@@ -231,7 +228,7 @@ type Msg = {
     cost?: number;
     providerID?: string;
     modelID?: string;
-    model?: { providerID?: string; modelID?: string; id?: string };
+    model?: ModelRef;
   };
   data?: {
     role?: string;
@@ -239,7 +236,7 @@ type Msg = {
     cost?: number;
     providerID?: string;
     modelID?: string;
-    model?: { providerID?: string; modelID?: string; id?: string };
+    model?: ModelRef;
   };
   role?: string;
   type?: string;
@@ -247,11 +244,11 @@ type Msg = {
   cost?: number;
   providerID?: string;
   modelID?: string;
-  model?: { providerID?: string; modelID?: string; id?: string };
+  model?: ModelRef;
   parts?: Part[];
 };
 
-type Call = { tokens?: Tokens; cost?: number; model?: Part["model"] };
+type Call = { tokens?: Tokens; cost?: number; model?: ModelRef };
 
 function normalizeMsg(m: Msg): NormalizedMsg {
   const info = m.info;
@@ -309,12 +306,6 @@ function accCall(acc: Acc, call: Call): void {
   acc.cost += safe(call.cost);
   acc.calls += 1;
   if (cacheRead > 0) acc.callsWithCacheRead += 1;
-  if (cacheWrite > 0) acc.callsWithCacheWrite += 1;
-  acc.lastInput = input;
-  acc.lastOutput = safe(t.output);
-  acc.lastReasoning = safe(t.reasoning);
-  acc.lastCacheRead = cacheRead;
-  acc.lastCacheWrite = cacheWrite;
 }
 
 function mergeAcc(dst: Acc, src: Acc): void {
@@ -327,7 +318,6 @@ function mergeAcc(dst: Acc, src: Acc): void {
   dst.count += src.count;
   dst.calls += src.calls;
   dst.callsWithCacheRead += src.callsWithCacheRead;
-  dst.callsWithCacheWrite += src.callsWithCacheWrite;
 }
 function mergeModel(dst: Map<string, Acc>, src: Map<string, Acc>): void {
   for (const [k, v] of src) {
@@ -340,7 +330,7 @@ function mergeModel(dst: Map<string, Acc>, src: Map<string, Acc>): void {
   }
 }
 
-function keyFor(model: Part["model"] | undefined, nm: NormalizedMsg): string {
+function keyFor(model: ModelRef | undefined, nm: NormalizedMsg): string {
   const p = model?.providerID ?? nm.providerID ?? "?";
   const q = model?.modelID ?? model?.id ?? nm.modelID ?? "?";
   return `${p}/${q}`;
@@ -374,16 +364,12 @@ function dominantModel(m: Map<string, Acc>): string | undefined {
   return best;
 }
 
-function fmtCost(n: number): string {
-  return `~$${n.toFixed(2)}`;
-}
-
-function fmtCost4(n: number): string {
-  return `~$${n.toFixed(4)}`;
+function fmtCost(n: number, digits = 2): string {
+  return `~$${n.toFixed(digits)}`;
 }
 
 function fmtCostPadded(n: number): string {
-  return padStart(fmtCost(n), COST_COL);
+  return fmtCost(n).padStart(COST_COL);
 }
 
 function tokenTotal(t: Acc): number {
@@ -480,28 +466,27 @@ async function collect(
     children.map(async (child) => {
       const cid = child?.id ?? "";
       if (!cid) return null;
-      const sub = await collect(client, state, cid, visited, signal);
-      return { child, cid, sub };
+      const childStats = await collect(client, state, cid, visited, signal);
+      return { child, cid, childStats };
     }),
   );
   for (const r of results) {
     if (!r || signal.aborted) continue;
-    const { child, cid, sub } = r;
-    subagents += 1 + sub.subagents;
+    const { child, cid, childStats } = r;
+    subagents += 1 + childStats.subagents;
     subs.push({
       id: cid,
       name: sanitize(agentName(child)) || cid,
-      hit: hitPct(sub.acc),
-      msgs: sub.acc.count,
-      calls: sub.acc.calls,
-      callsWithCacheRead: sub.acc.callsWithCacheRead,
-      tokens: tokenTotal(sub.acc),
-      cost: sub.acc.cost,
-      model: dominantModel(sub.perModel),
+      hit: hitPct(childStats.acc),
+      calls: childStats.acc.calls,
+      callsWithCacheRead: childStats.acc.callsWithCacheRead,
+      tokens: tokenTotal(childStats.acc),
+      cost: childStats.acc.cost,
+      model: dominantModel(childStats.perModel),
     });
-    mergeAcc(acc, sub.acc);
-    mergeModel(perModel, sub.perModel);
-    subs.push(...sub.subs);
+    mergeAcc(acc, childStats.acc);
+    mergeModel(perModel, childStats.perModel);
+    subs.push(...childStats.subs);
   }
 
   return { acc, subagents, perModel, subs };
@@ -523,67 +508,71 @@ function SectionHeader(props: { theme: Theme; title: string; count?: string }) {
   );
 }
 
+function SummaryRow(props: {
+  theme: Theme;
+  label: string;
+  value: string;
+  valueColor?: RGBA;
+}) {
+  return (
+    <text fg={props.theme.textMuted} wrapMode="none">
+      {props.label.padEnd(SUMMARY_LABEL_COL)}{" "}
+      <b>
+        <span style={{ fg: props.valueColor ?? props.theme.text }}>
+          {props.value.padStart(VAL_COL)}
+        </span>
+      </b>
+    </text>
+  );
+}
+
 function SummarySection(props: {
   theme: Theme;
-  s: Acc;
-  models: number;
-  subagents: number;
+  acc: Acc;
+  modelCount: number;
+  subagentCount: number;
 }) {
   const theme = props.theme;
-  const s = props.s;
+  const acc = props.acc;
   return (
     <>
       <SectionHeader theme={theme} title="Session Summary" />
       <box flexDirection="row" paddingLeft={2}>
         <box flexDirection="column" gap={0}>
-          <text fg={theme.textMuted} wrapMode="none">
-            {padEnd("Total Calls", 13)}{" "}
-            <b>
-              <span style={{ fg: theme.text }}>
-                {padStart(String(s.calls), VAL_COL)}
-              </span>
-            </b>
-          </text>
-          <text fg={theme.textMuted} wrapMode="none">
-            {padEnd("Models", 13)}{" "}
-            <b>
-              <span style={{ fg: theme.text }}>
-                {padStart(String(props.models), VAL_COL)}
-              </span>
-            </b>
-          </text>
-          <text fg={theme.textMuted} wrapMode="none">
-            {padEnd("Subagents", 13)}{" "}
-            <b>
-              <span style={{ fg: theme.text }}>
-                {padStart(String(props.subagents), VAL_COL)}
-              </span>
-            </b>
-          </text>
+          <SummaryRow
+            theme={theme}
+            label="Total Calls"
+            value={String(acc.calls).padStart(VAL_COL)}
+          />
+          <SummaryRow
+            theme={theme}
+            label="Models"
+            value={String(props.modelCount).padStart(VAL_COL)}
+          />
+          <SummaryRow
+            theme={theme}
+            label="Subagents"
+            value={String(props.subagentCount).padStart(VAL_COL)}
+          />
         </box>
         <box flexDirection="column" gap={0} paddingLeft={2}>
-          <text fg={theme.textMuted} wrapMode="none">
-            {padEnd("Total Tokens", 13)}{" "}
-            <b>
-              <span style={{ fg: theme.syntaxNumber }}>
-                {padStart(fmt(tokenTotal(s)), VAL_COL)}
-              </span>
-            </b>
-          </text>
-          <text fg={theme.textMuted} wrapMode="none">
-            {padEnd("Cached Tokens", 13)}{" "}
-            <b>
-              <span style={{ fg: theme.info }}>
-                {padStart(fmt(s.cacheRead), VAL_COL)}
-              </span>
-            </b>
-          </text>
-          <text fg={theme.textMuted} wrapMode="none">
-            {padEnd("Total Cost", 13)}{" "}
-            <b>
-              <span style={{ fg: theme.text }}>{fmtCostPadded(s.cost)}</span>
-            </b>
-          </text>
+          <SummaryRow
+            theme={theme}
+            label="Total Tokens"
+            value={fmt(tokenTotal(acc)).padStart(VAL_COL)}
+            valueColor={theme.syntaxNumber}
+          />
+          <SummaryRow
+            theme={theme}
+            label="Cached Tokens"
+            value={fmt(acc.cacheRead).padStart(VAL_COL)}
+            valueColor={theme.info}
+          />
+          <SummaryRow
+            theme={theme}
+            label="Total Cost"
+            value={fmtCostPadded(acc.cost)}
+          />
         </box>
       </box>
     </>
@@ -605,14 +594,15 @@ function TreeRow(props: {
   value: string;
   valueColor?: RGBA;
   suffix?: string;
+  trail?: JSX.Element;
 }) {
   return (
     <text fg={props.theme.textMuted} wrapMode="none">
       {props.last ? "└─ " : "├─ "}
-      {padEnd(props.label, 16)}
+      {props.label.padEnd(LABEL_COL)}
       <b>
         <span style={{ fg: props.valueColor ?? props.theme.text }}>
-          {padStart(props.value, 8)}
+          {props.value.padStart(VAL_COL)}
         </span>
       </b>
       {props.suffix ? (
@@ -620,7 +610,42 @@ function TreeRow(props: {
           <span style={{ fg: props.theme.textMuted }}>{props.suffix}</span>
         </b>
       ) : null}
+      {props.trail ? props.trail : null}
     </text>
+  );
+}
+
+function ModelRow(props: { theme: Theme; model: { key: string; acc: Acc }; cell: number }) {
+  const theme = props.theme;
+  const { key, acc } = props.model;
+  const hit = hitPct(acc);
+  const hitColor = hitStyle(theme, hit).color;
+  const name = truncate(short(key), props.cell);
+  const provider = providerOf(key);
+  return (
+    <box flexDirection="column" gap={0}>
+      <text fg={theme.textMuted} wrapMode="none">
+        <b>
+          <span style={{ fg: theme.text }}>{name.padEnd(props.cell)}</span>
+        </b>
+        {"  "}
+        <b>
+          <span style={{ fg: hitColor }}>{fmtHit(hit).padStart(MODEL_HIT_COL)}</span>
+        </b>
+        {"  "}
+        <HitBar theme={theme} pct={hit} width={BAR_WIDTH} />
+      </text>
+      {hit >= 0 && provider ? (
+        <MetaLine
+          theme={theme}
+          label={provider}
+          labelCol={PROVIDER_COL}
+          tokenCol={MODEL_TOKEN_COL}
+          tokens={tokenTotal(acc)}
+          cost={acc.cost}
+        />
+      ) : null}
+    </box>
   );
 }
 
@@ -638,52 +663,28 @@ function ModelsSection(props: {
         count={String(props.models.length)}
       />
       <box flexDirection="column" gap={0} paddingLeft={2}>
-        {props.models.map((model) => {
-          const m = model.acc;
-          const mh = hitPct(m);
-          const mc = hitStyle(theme, mh).color;
-          const name = truncate(short(model.key), props.cell);
-          const provider = providerOf(model.key);
-          return (
-            <box flexDirection="column" gap={0}>
-              <text fg={theme.textMuted} wrapMode="none">
-                <b>
-                  <span style={{ fg: theme.text }}>
-                    {padEnd(name, props.cell)}
-                  </span>
-                </b>
-                {"  "}
-                <b>
-                  <span style={{ fg: mc }}>{padStart(fmtHit(mh), 5)}</span>
-                </b>
-                {"  "}
-                <HitBar theme={theme} pct={mh} width={BAR_WIDTH} />
-              </text>
-              {mh >= 0 && provider ? (
-                <text fg={theme.textMuted} wrapMode="none">
-                  └─ {padEnd(truncate(provider, 11), 11)}{" "}
-                  {padStart(fmt(tokenTotal(m)), 6)} {fmtCostPadded(m.cost)}
-                </text>
-              ) : null}
-            </box>
-          );
-        })}
+        {props.models.map((model) => (
+          <ModelRow theme={theme} model={model} cell={props.cell} />
+        ))}
       </box>
     </>
   );
 }
 
-function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
+function deriveTotals(acc: Acc): { efficiencyPct: number } {
+  return {
+    efficiencyPct:
+      acc.calls > 0 ? (100 * acc.callsWithCacheRead) / acc.calls : -1,
+  };
+}
+
+function TotalsSection(props: { theme: Theme; acc: Acc; subagents: number }) {
   const theme = props.theme;
-  const s = props.s;
+  const acc = props.acc;
   const subWord = props.subagents === 1 ? "subagent" : "subagents";
-  const inDenom = s.input + s.cacheRead;
-  const effH = s.calls > 0 ? (100 * s.callsWithCacheRead) / s.calls : -1;
-  const effColor = hitStyle(theme, effH).color;
-  const lastHit =
-    s.lastInput + s.lastCacheRead > 0
-      ? (100 * s.lastCacheRead) / (s.lastInput + s.lastCacheRead)
-      : -1;
+  const { efficiencyPct } = deriveTotals(acc);
+  const effColor = hitStyle(theme, efficiencyPct).color;
+  const total = tokenTotal(acc);
   return (
     <>
       <SectionHeader
@@ -696,125 +697,98 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
         <TreeRow
           theme={theme}
           label="Fresh Input"
-          value={fmt(s.input)}
+          value={fmt(acc.input)}
           valueColor={theme.syntaxNumber}
-          suffix={pctSuffix(s.input, inDenom)}
+          suffix={pctSuffix(acc.input, total)}
         />
         <TreeRow
           theme={theme}
           label="Cache Read"
-          value={fmt(s.cacheRead)}
+          value={fmt(acc.cacheRead)}
           valueColor={theme.info}
-          suffix={pctSuffix(s.cacheRead, inDenom)}
+          suffix={pctSuffix(acc.cacheRead, total)}
         />
         <TreeRow
           theme={theme}
           label="Output"
-          value={fmt(s.output)}
+          value={fmt(acc.output)}
           valueColor={theme.syntaxNumber}
-          suffix={pctSuffix(s.output, tokenTotal(s))}
+          suffix={pctSuffix(acc.output, total)}
         />
         <TreeRow
           theme={theme}
           last
           label="Reasoning"
-          value={fmt(s.reasoning)}
+          value={fmt(acc.reasoning)}
           valueColor={theme.syntaxNumber}
-          suffix={pctSuffix(s.reasoning, tokenTotal(s))}
+          suffix={pctSuffix(acc.reasoning, total)}
         />
         <GroupLabel theme={theme} title="Calls" />
-        <TreeRow theme={theme} label="Total" value={String(s.calls)} />
+        <TreeRow theme={theme} label="Total" value={String(acc.calls)} />
         <TreeRow
           theme={theme}
           label="Cache Hits"
-          value={String(s.callsWithCacheRead)}
-          suffix={pctSuffix(s.callsWithCacheRead, s.calls)}
+          value={String(acc.callsWithCacheRead)}
+          suffix={pctSuffix(acc.callsWithCacheRead, acc.calls)}
         />
         <TreeRow
           theme={theme}
           label="Cache Misses"
-          value={String(s.calls - s.callsWithCacheRead)}
-          suffix={pctSuffix(s.calls - s.callsWithCacheRead, s.calls)}
+          value={String(acc.calls - acc.callsWithCacheRead)}
+          suffix={pctSuffix(acc.calls - acc.callsWithCacheRead, acc.calls)}
         />
-        <text fg={theme.textMuted} wrapMode="none">
-          └─ {padEnd("Cache Efficiency", 16)}
-          <b>
-            <span style={{ fg: effColor }}>{padStart(fmtHit(effH), 8)}</span>
-          </b>{" "}
-          <HitBar theme={theme} pct={effH} width={BAR_WIDTH} />
-        </text>
+        <TreeRow
+          theme={theme}
+          last
+          label="Cache Efficiency"
+          value={fmtHit(efficiencyPct)}
+          valueColor={effColor}
+          trail={
+            <>
+              {" "}
+              <HitBar theme={theme} pct={efficiencyPct} width={BAR_WIDTH} />
+            </>
+          }
+        />
         <GroupLabel theme={theme} title="Cost" />
         <TreeRow
           theme={theme}
           label="Total Cost"
-          value={fmtCostPadded(s.cost)}
+          value={fmtCostPadded(acc.cost)}
         />
         <TreeRow
           theme={theme}
           last
           label="Cache Writes"
-          value={fmt(s.cacheWrite)}
+          value={fmt(acc.cacheWrite)}
           valueColor={theme.warning}
         />
-        {s.calls > 0 ? (
+        {acc.calls > 0 ? (
           <>
             <GroupLabel theme={theme} title="Avg per Call" />
             <TreeRow
               theme={theme}
               label="Fresh Input"
-              value={fmt(s.input / s.calls)}
+              value={fmt(acc.input / acc.calls)}
               valueColor={theme.syntaxNumber}
-              suffix={pctSuffix(s.input, tokenTotal(s))}
             />
             <TreeRow
               theme={theme}
               label="Cache Read"
-              value={fmt(s.cacheRead / s.calls)}
+              value={fmt(acc.cacheRead / acc.calls)}
               valueColor={theme.info}
-              suffix={pctSuffix(s.cacheRead, tokenTotal(s))}
             />
             <TreeRow
               theme={theme}
               label="Output"
-              value={fmt(s.output / s.calls)}
+              value={fmt(acc.output / acc.calls)}
               valueColor={theme.syntaxNumber}
-              suffix={pctSuffix(s.output, tokenTotal(s))}
             />
             <TreeRow
               theme={theme}
               last
               label="Cost"
-              value={fmtCost4(s.cost / s.calls)}
-            />
-          </>
-        ) : null}
-        {s.lastInput + s.lastCacheRead > 0 ? (
-          <>
-            <GroupLabel theme={theme} title="Last Request" />
-            <TreeRow
-              theme={theme}
-              label="Fresh Input"
-              value={fmt(s.lastInput)}
-              valueColor={theme.syntaxNumber}
-            />
-            <TreeRow
-              theme={theme}
-              label="Cache Read"
-              value={fmt(s.lastCacheRead)}
-              valueColor={theme.info}
-            />
-            <TreeRow
-              theme={theme}
-              label="Output"
-              value={fmt(s.lastOutput)}
-              valueColor={theme.syntaxNumber}
-            />
-            <TreeRow
-              theme={theme}
-              last
-              label="Hit Rate"
-              value={fmtHit(lastHit)}
-              valueColor={hitStyle(theme, lastHit).color}
+              value={fmtCost(acc.cost / acc.calls, 4)}
             />
           </>
         ) : null}
@@ -830,71 +804,164 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
   );
 }
 
+function VSpacer() {
+  return <box height={1} />;
+}
+
+function MetaLine(props: {
+  theme: Theme;
+  label: string;
+  labelCol: number;
+  tokenCol: number;
+  tokens: number;
+  cost: number;
+}) {
+  return (
+    <text fg={props.theme.textMuted} wrapMode="none">
+      └─ {truncate(props.label, props.labelCol).padEnd(props.labelCol)}{" "}
+      {fmt(props.tokens).padStart(props.tokenCol)} {fmtCostPadded(props.cost)}
+    </text>
+  );
+}
+
+function SubagentRow(props: { theme: Theme; sub: Sub }) {
+  const theme = props.theme;
+  const sub = props.sub;
+  const named = sub.name !== sub.id;
+  return (
+    <>
+      <text fg={theme.textMuted} wrapMode="none">
+        <b>
+          <span style={{ fg: theme.text }}>
+            {(named
+                ? truncate(sub.name, SUB_NAME_COL)
+                : truncate(sub.id, SUB_NAME_COL)
+            ).padEnd(SUB_NAME_COL)}
+          </span>
+        </b>{" "}
+        {named ? (
+          <b>
+            <span style={{ fg: theme.textMuted }}>
+              {shortId(sub.id).padEnd(SUB_ID_COL)}
+            </span>
+          </b>
+        ) : null}
+        <b>
+          <span style={{ fg: hitStyle(theme, sub.hit).color }}>
+            {fmtHit(sub.hit).padStart(HIT_COL)}
+          </span>
+        </b>
+        {sub.calls > 0 ? (
+          <b>
+            <span style={{ fg: theme.textMuted }}>
+              {" "}
+              {`${String(sub.callsWithCacheRead)}/${String(sub.calls)}`.padStart(RATIO_COL)}{" "}
+              hit
+            </span>
+          </b>
+        ) : null}
+      </text>
+      {sub.model ? (
+        <MetaLine
+          theme={theme}
+          label={short(sub.model)}
+          labelCol={MODEL_COL}
+          tokenCol={TOKEN_COL}
+          tokens={sub.tokens}
+          cost={sub.cost}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
   const theme = props.theme;
   if (props.subs.length === 0) return null;
   return (
     <>
-      <box height={1} />
+      <VSpacer />
       <SectionHeader
         theme={theme}
         title="Subagents"
         count={String(props.subs.length)}
       />
       <box flexDirection="column" gap={0} paddingLeft={2}>
-        {props.subs.map((sub, i) => {
-          const named = sub.name !== sub.id;
-          return (
-            <>
-              {i > 0 ? <box height={1} /> : null}
-              <text fg={theme.textMuted} wrapMode="none">
-                <b>
-                  <span style={{ fg: theme.text }}>
-                    {padEnd(
-                      named
-                        ? truncate(sub.name, SUB_NAME_COL)
-                        : truncate(sub.id, SUB_NAME_COL),
-                      SUB_NAME_COL,
-                    )}
-                  </span>
-                </b>{" "}
-                {named ? (
-                  <b>
-                    <span style={{ fg: theme.textMuted }}>
-                      {padEnd(shortId(sub.id), SUB_ID_COL)}
-                    </span>
-                  </b>
-                ) : null}
-                <b>
-                  <span style={{ fg: hitStyle(theme, sub.hit).color }}>
-                    {padStart(fmtHit(sub.hit), HIT_COL)}
-                  </span>
-                </b>
-                {sub.calls > 0 ? (
-                  <b>
-                    <span style={{ fg: theme.textMuted }}>
-                      {" "}
-                      {padStart(
-                        `${String(sub.callsWithCacheRead)}/${String(sub.calls)}`,
-                        7,
-                      )}{" "}
-                      hit
-                    </span>
-                  </b>
-                ) : null}
-              </text>
-              {sub.model ? (
-                <text fg={theme.textMuted} wrapMode="none">
-                  └─ {padEnd(truncate(short(sub.model), MODEL_COL), MODEL_COL)}{" "}
-                  {padStart(fmt(sub.tokens), HIT_COL)} {fmtCostPadded(sub.cost)}
-                </text>
-              ) : null}
-            </>
-          );
-        })}
+        {props.subs.map((sub, i) => (
+          <>
+            {i > 0 ? <VSpacer /> : null}
+            <SubagentRow theme={theme} sub={sub} />
+          </>
+        ))}
       </box>
     </>
   );
+}
+
+function EmptyState(props: { theme: Theme; title: string; streaming: boolean }) {
+  return (
+    <box
+      flexDirection="column"
+      width="100%"
+      gap={0}
+      paddingTop={2}
+      paddingBottom={2}
+    >
+      <text fg={props.theme.textMuted} wrapMode="none">
+        {props.streaming ? (
+          <>
+            No token data for{" "}
+            <b>
+              <span style={{ fg: props.theme.text }}>
+                {truncate(props.title, EMPTY_TITLE_MAX)}
+              </span>
+            </b>{" "}
+            yet.
+          </>
+        ) : (
+          "No cache statistics available for this session."
+        )}
+      </text>
+      <text fg={props.theme.textMuted} wrapMode="none">
+        {props.streaming
+          ? "Wait for the session to finish streaming, then open again."
+          : "Run at least one assistant request to generate cache metrics."}
+      </text>
+    </box>
+  );
+}
+
+function LevelLegend(props: { theme: Theme }) {
+  const theme = props.theme;
+  return (
+    <text
+      fg={theme.borderSubtle}
+      wrapMode="none"
+      style={{ attributes: TextAttributes.ITALIC | TextAttributes.DIM }}
+    >
+      CH Levels
+      {HIT_LEVELS.map((level) => (
+        <>
+          <b>
+            <span style={{ fg: theme.textMuted }}>·</span>
+          </b>{" "}
+          <b>
+            <span style={{ fg: level.color(theme) }}>●</span>
+          </b>{" "}
+          <b>
+            <span style={{ fg: theme.textMuted }}>{level.range}</span>
+          </b>{" "}
+        </>
+      ))}
+    </text>
+  );
+}
+
+function modelCellWidth(models: { key: string; acc: Acc }[]): number {
+  let maxKey = 0;
+  for (const model of models)
+    maxKey = Math.max(maxKey, short(model.key).length);
+  return Math.min(Math.max(maxKey, CELL_MIN), CELL_MAX);
 }
 
 function CacheStatsView(props: {
@@ -906,13 +973,10 @@ function CacheStatsView(props: {
   models: { key: string; acc: Acc }[];
 }) {
   const theme = props.theme;
-  const s = props.acc;
-  const h = hitPct(s);
+  const acc = props.acc;
+  const h = hitPct(acc);
   const head = hitStyle(theme, h);
-  let maxKey = 0;
-  for (const model of props.models)
-    maxKey = Math.max(maxKey, short(model.key).length);
-  const cell = Math.min(Math.max(maxKey, CELL_MIN), CELL_MAX);
+  const cell = modelCellWidth(props.models);
 
   let scroll: ScrollHandle | undefined;
   useKeyboard((evt) => {
@@ -959,7 +1023,7 @@ function CacheStatsView(props: {
             </span>
           </b>
         </text>
-        <text fg={theme.textMuted}>{s.calls > 0 ? "↑/↓ · esc" : "esc"}</text>
+        <text fg={theme.textMuted}>{acc.calls > 0 ? "↑/↓ · esc" : "esc"}</text>
       </box>
       <text fg={theme.borderSubtle} wrapMode="none">
         {SEPARATOR}
@@ -976,50 +1040,18 @@ function CacheStatsView(props: {
           scroll = r as ScrollHandle;
         }}
       >
-        {s.calls === 0 ? (
-          s.count > 0 ? (
-            <box
-              flexDirection="column"
-              width="100%"
-              gap={0}
-              paddingTop={2}
-              paddingBottom={2}
-            >
-              <text fg={theme.textMuted} wrapMode="none">
-                No token data for{" "}
-                <b>
-                  <span style={{ fg: theme.text }}>
-                    {truncate(props.title, EMPTY_TITLE_MAX)}
-                  </span>
-                </b>{" "}
-                yet.
-              </text>
-              <text fg={theme.textMuted} wrapMode="none">
-                Wait for the session to finish streaming, then open again.
-              </text>
-            </box>
-          ) : (
-            <box
-              flexDirection="column"
-              width="100%"
-              gap={0}
-              paddingTop={2}
-              paddingBottom={2}
-            >
-              <text fg={theme.textMuted} wrapMode="none">
-                No cache statistics available for this session.
-              </text>
-              <text fg={theme.textMuted} wrapMode="none">
-                Run at least one assistant request to generate cache metrics.
-              </text>
-            </box>
-          )
+        {acc.calls === 0 ? (
+          <EmptyState
+            theme={theme}
+            title={props.title}
+            streaming={acc.count > 0}
+          />
         ) : (
           <box flexDirection="column" width="100%" gap={0}>
             <text fg={theme.textMuted} wrapMode="none">
               <HitBar theme={theme} pct={h} width={BAR_WIDTH} />{" "}
               <b>
-                <span style={{ fg: head.color }}>{hitText(s)}</span>
+                <span style={{ fg: head.color }}>{fmtHit(h)}</span>
               </b>{" "}
               <b>
                 <span style={{ fg: head.color }}>{head.word}</span>
@@ -1027,75 +1059,29 @@ function CacheStatsView(props: {
               · overall cache hit
             </text>
 
-            <box height={1} />
+            <VSpacer />
 
             <SummarySection
               theme={theme}
-              s={s}
-              models={props.models.length}
-              subagents={props.subagents}
+              acc={acc}
+              modelCount={props.models.length}
+              subagentCount={props.subagents}
             />
 
-            <box height={1} />
+            <VSpacer />
 
             <ModelsSection theme={theme} models={props.models} cell={cell} />
 
-            <box height={1} />
+            <VSpacer />
 
-            <TotalsSection theme={theme} s={s} subagents={props.subagents} />
+            <TotalsSection theme={theme} acc={acc} subagents={props.subagents} />
 
             <SubagentsSection theme={theme} subs={props.subs} />
           </box>
         )}
       </scrollbox>
 
-      <text
-        fg={theme.borderSubtle}
-        wrapMode="none"
-        style={{ attributes: TextAttributes.ITALIC | TextAttributes.DIM }}
-      >
-        CH Levels
-        <b>
-          <span style={{ fg: theme.textMuted }}>·</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.success }}>●</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.textMuted }}>≥{HIT_EXCELLENT}%</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.textMuted }}>·</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.info }}>●</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.textMuted }}>
-            {HIT_GOOD}–{HIT_EXCELLENT - 1}%
-          </span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.textMuted }}>·</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.warning }}>●</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.textMuted }}>
-            {HIT_FAIR}–{HIT_GOOD - 1}%
-          </span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.textMuted }}>·</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.error }}>●</span>
-        </b>{" "}
-        <b>
-          <span style={{ fg: theme.textMuted }}>&lt;{HIT_FAIR}%</span>
-        </b>
-      </text>
+      <LevelLegend theme={theme} />
     </box>
   );
 }
