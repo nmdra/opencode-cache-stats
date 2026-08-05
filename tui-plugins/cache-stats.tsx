@@ -97,9 +97,9 @@ const CELL_MAX = 30;
 const HEADER_TITLE_MAX = 30;
 const EMPTY_TITLE_MAX = 40;
 const SUB_NAME_COL = 12;
-const SUB_ID_COL = 12;
+const SUB_ID_COL = 17;
 const MODEL_COL = 21;
-const HIT_COL = 7;
+const HIT_COL = 8;
 const PAGE_STEP = 10;
 const VAL_COL = 8;
 const COST_COL = 8;
@@ -197,6 +197,12 @@ function sanitize(s: string): string {
 function short(s: string): string {
   const i = s.indexOf("/");
   return i >= 0 ? s.slice(i + 1) : s;
+}
+
+function shortId(s: string): string {
+  const head = s.slice(0, 4);
+  const tail = s.slice(-8);
+  return s.length > head.length + tail.length ? `${head}…${tail}` : s;
 }
 
 function providerOf(key: string): string {
@@ -528,45 +534,57 @@ function SummarySection(props: {
   return (
     <>
       <SectionHeader theme={theme} title="Session Summary" />
-      <box flexDirection="column" gap={0} paddingLeft={2}>
-        <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Total Calls", 16)}{" "}
-          <b>
-            <span style={{ fg: theme.text }}>
-              {padStart(String(s.calls), VAL_COL)}
-            </span>
-          </b>
-        </text>
-        <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Models", 16)}{" "}
-          <b>
-            <span style={{ fg: theme.text }}>
-              {padStart(String(props.models), VAL_COL)}
-            </span>
-          </b>
-        </text>
-        <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Subagents", 16)}{" "}
-          <b>
-            <span style={{ fg: theme.text }}>
-              {padStart(String(props.subagents), VAL_COL)}
-            </span>
-          </b>
-        </text>
-        <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Total Tokens", 16)}{" "}
-          <b>
-            <span style={{ fg: theme.syntaxNumber }}>
-              {padStart(fmt(tokenTotal(s)), VAL_COL)}
-            </span>
-          </b>
-        </text>
-        <text fg={theme.textMuted} wrapMode="none">
-          {padEnd("Total Cost", 16)}{" "}
-          <b>
-            <span style={{ fg: theme.text }}>{fmtCostPadded(s.cost)}</span>
-          </b>
-        </text>
+      <box flexDirection="row" paddingLeft={2}>
+        <box flexDirection="column" gap={0}>
+          <text fg={theme.textMuted} wrapMode="none">
+            {padEnd("Total Calls", 13)}{" "}
+            <b>
+              <span style={{ fg: theme.text }}>
+                {padStart(String(s.calls), VAL_COL)}
+              </span>
+            </b>
+          </text>
+          <text fg={theme.textMuted} wrapMode="none">
+            {padEnd("Models", 13)}{" "}
+            <b>
+              <span style={{ fg: theme.text }}>
+                {padStart(String(props.models), VAL_COL)}
+              </span>
+            </b>
+          </text>
+          <text fg={theme.textMuted} wrapMode="none">
+            {padEnd("Subagents", 13)}{" "}
+            <b>
+              <span style={{ fg: theme.text }}>
+                {padStart(String(props.subagents), VAL_COL)}
+              </span>
+            </b>
+          </text>
+        </box>
+        <box flexDirection="column" gap={0} paddingLeft={2}>
+          <text fg={theme.textMuted} wrapMode="none">
+            {padEnd("Total Tokens", 13)}{" "}
+            <b>
+              <span style={{ fg: theme.syntaxNumber }}>
+                {padStart(fmt(tokenTotal(s)), VAL_COL)}
+              </span>
+            </b>
+          </text>
+          <text fg={theme.textMuted} wrapMode="none">
+            {padEnd("Cached Tokens", 13)}{" "}
+            <b>
+              <span style={{ fg: theme.info }}>
+                {padStart(fmt(s.cacheRead), VAL_COL)}
+              </span>
+            </b>
+          </text>
+          <text fg={theme.textMuted} wrapMode="none">
+            {padEnd("Total Cost", 13)}{" "}
+            <b>
+              <span style={{ fg: theme.text }}>{fmtCostPadded(s.cost)}</span>
+            </b>
+          </text>
+        </box>
       </box>
     </>
   );
@@ -694,6 +712,7 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
           label="Output"
           value={fmt(s.output)}
           valueColor={theme.syntaxNumber}
+          suffix={pctSuffix(s.output, tokenTotal(s))}
         />
         <TreeRow
           theme={theme}
@@ -701,6 +720,7 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
           label="Reasoning"
           value={fmt(s.reasoning)}
           valueColor={theme.syntaxNumber}
+          suffix={pctSuffix(s.reasoning, tokenTotal(s))}
         />
         <GroupLabel theme={theme} title="Calls" />
         <TreeRow theme={theme} label="Total" value={String(s.calls)} />
@@ -714,6 +734,7 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
           theme={theme}
           label="Cache Misses"
           value={String(s.calls - s.callsWithCacheRead)}
+          suffix={pctSuffix(s.calls - s.callsWithCacheRead, s.calls)}
         />
         <text fg={theme.textMuted} wrapMode="none">
           └─ {padEnd("Cache Efficiency", 16)}
@@ -743,18 +764,21 @@ function TotalsSection(props: { theme: Theme; s: Acc; subagents: number }) {
               label="Fresh Input"
               value={fmt(s.input / s.calls)}
               valueColor={theme.syntaxNumber}
+              suffix={pctSuffix(s.input, tokenTotal(s))}
             />
             <TreeRow
               theme={theme}
               label="Cache Read"
               value={fmt(s.cacheRead / s.calls)}
               valueColor={theme.info}
+              suffix={pctSuffix(s.cacheRead, tokenTotal(s))}
             />
             <TreeRow
               theme={theme}
               label="Output"
               value={fmt(s.output / s.calls)}
               valueColor={theme.syntaxNumber}
+              suffix={pctSuffix(s.output, tokenTotal(s))}
             />
             <TreeRow
               theme={theme}
@@ -818,10 +842,11 @@ function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
         count={String(props.subs.length)}
       />
       <box flexDirection="column" gap={0} paddingLeft={2}>
-        {props.subs.map((sub) => {
+        {props.subs.map((sub, i) => {
           const named = sub.name !== sub.id;
           return (
             <>
+              {i > 0 ? <box height={1} /> : null}
               <text fg={theme.textMuted} wrapMode="none">
                 <b>
                   <span style={{ fg: theme.text }}>
@@ -836,7 +861,7 @@ function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
                 {named ? (
                   <b>
                     <span style={{ fg: theme.textMuted }}>
-                      {padEnd(truncate(sub.id, SUB_ID_COL), SUB_ID_COL)}
+                      {padEnd(shortId(sub.id), SUB_ID_COL)}
                     </span>
                   </b>
                 ) : null}
@@ -851,7 +876,7 @@ function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
                       {" "}
                       {padStart(
                         `${String(sub.callsWithCacheRead)}/${String(sub.calls)}`,
-                        5,
+                        7,
                       )}{" "}
                       hit
                     </span>
@@ -861,7 +886,7 @@ function SubagentsSection(props: { theme: Theme; subs: Sub[] }) {
               {sub.model ? (
                 <text fg={theme.textMuted} wrapMode="none">
                   └─ {padEnd(truncate(short(sub.model), MODEL_COL), MODEL_COL)}{" "}
-                  {padStart(fmt(sub.tokens), HIT_COL)}
+                  {padStart(fmt(sub.tokens), HIT_COL)} {fmtCostPadded(sub.cost)}
                 </text>
               ) : null}
             </>
