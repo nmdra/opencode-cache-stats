@@ -364,7 +364,7 @@ function dominantModel(m: Map<string, Acc>): string | undefined {
   return best;
 }
 
-function fmtCost(n: number, digits = 2): string {
+function fmtCost(n: number, digits = 3): string {
   return `~$${n.toFixed(digits)}`;
 }
 
