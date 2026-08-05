@@ -41,7 +41,7 @@ The dialog sorts the models by cache hit rate. The model with the highest rate i
 
 ## The totals section
 
-The totals section groups the metrics. The group `Tokens` shows the fresh input, the cache read, the output, and the reasoning tokens. Each value has a percentage. The percentage is the share of all tokens in the session. The group `Calls` shows the total calls, the cache hits, the cache misses, and a cache-efficiency bar. The group `Cost` shows the total cost and the cache writes.
+The totals section groups the metrics. The group `Tokens` shows the fresh input, the cache read, the output, the reasoning, and the cache-write tokens. Each value has a percentage. The percentage is the share of all tokens in the session. The group `Calls` shows the total calls, the cache hits, the cache misses, and a cache-efficiency bar. The group `Cost` shows the total cost.
 
 The group `Avg per Call` shows the averages per call. The averages are the totals divided by the number of calls.
 

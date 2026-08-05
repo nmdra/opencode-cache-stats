@@ -365,7 +365,8 @@ function dominantModel(m: Map<string, Acc>): string | undefined {
 }
 
 function fmtCost(n: number, digits = 3): string {
-  return `~$${n.toFixed(digits)}`;
+  const s = `~$${n.toFixed(digits)}`;
+  return s.length > COST_COL ? s.slice(1) : s;
 }
 
 function fmtCostPadded(n: number): string {
@@ -717,11 +718,18 @@ function TotalsSection(props: { theme: Theme; acc: Acc; subagents: number }) {
         />
         <TreeRow
           theme={theme}
-          last
           label="Reasoning"
           value={fmt(acc.reasoning)}
           valueColor={theme.syntaxNumber}
           suffix={pctSuffix(acc.reasoning, total)}
+        />
+        <TreeRow
+          theme={theme}
+          last
+          label="Cache Writes"
+          value={fmt(acc.cacheWrite)}
+          valueColor={theme.warning}
+          suffix={pctSuffix(acc.cacheWrite, total)}
         />
         <GroupLabel theme={theme} title="Calls" />
         <TreeRow theme={theme} label="Total" value={String(acc.calls)} />
@@ -753,15 +761,9 @@ function TotalsSection(props: { theme: Theme; acc: Acc; subagents: number }) {
         <GroupLabel theme={theme} title="Cost" />
         <TreeRow
           theme={theme}
-          label="Total Cost"
-          value={fmtCostPadded(acc.cost)}
-        />
-        <TreeRow
-          theme={theme}
           last
-          label="Cache Writes"
-          value={fmt(acc.cacheWrite)}
-          valueColor={theme.warning}
+          label="Total Cost"
+          value={fmtCost(acc.cost, 5)}
         />
         {acc.calls > 0 ? (
           <>
@@ -788,7 +790,7 @@ function TotalsSection(props: { theme: Theme; acc: Acc; subagents: number }) {
               theme={theme}
               last
               label="Cost"
-              value={fmtCost(acc.cost / acc.calls, 4)}
+              value={fmtCost(acc.cost / acc.calls, 5)}
             />
           </>
         ) : null}
