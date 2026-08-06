@@ -1,18 +1,8 @@
-# cache-stats
+# /cache-stats
 
-`cache-stats` is a TUI plugin for [opencode](https://opencode.ai). A TUI is a text user interface. The plugin shows the prompt-cache hit rate of the active session in a popup dialog.
+/cache-stats is a lightweight TUI plugin for opencode that displays the active session's cache statistics in a popup dialog. It provides the overall cache hit rate, a breakdown by model and subagent, and the associated costs, making it easy to understand cache performance at a glance.
 
-Run the `/cache-stats` command (or the `cache-stats.show` command) inside a session to open the dialog.
-
-## Features
-
-- Shows the cache hit rate of the active session with a hit bar and a verdict word.
-- Shows totals for tokens, calls, and cost.
-- Groups the totals by model and by subagent.
-- Shows the hit rate of each model and each subagent.
-- Shows averages per call.
-- Colors the rates by level: Excellent, Good, Fair, or Poor.
-- Scrolls with the arrow keys and the page keys.
+> Run the `/cache-stats` command (or the `cache-stats.show` command) inside a session to open the dialog.
 
 | Summary and models | Totals breakdown | Subagents |
 |:---:|:---:|:---:|
@@ -51,11 +41,6 @@ A cache write is a one-time priming cost. It is excluded from the hit ratio. The
 The repo keeps a copy of `tui.json` as `tui.json.example`.
 
 After you change `tui.json`, restart [opencode](https://opencode.ai). Then run the `/cache-stats` command inside a session.
-
-## Files
-
-- `tui-plugins/cache-stats.tsx` — the TUI plugin
-- `tui.json.example` — registration config example
 
 ## Documentation
 
