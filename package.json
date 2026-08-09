@@ -1,0 +1,29 @@
+{
+  "name": "opencode-cache-stats",
+  "version": "0.1.0",
+  "description": "TUI plugin for opencode showing the active session's cache statistics",
+  "type": "module",
+  "files": [
+    "tui-plugins/"
+  ],
+  "exports": {
+    "./tui": {
+      "import": "./tui-plugins/cache-stats.tsx"
+    }
+  },
+  "engines": {
+    "opencode": "^1.0.0"
+  },
+  "keywords": [
+    "opencode",
+    "tui",
+    "plugin",
+    "cache"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.17.18",
+    "@opentui/core": ">=0.4.3",
+    "@opentui/solid": ">=0.4.3"
+  }
+}

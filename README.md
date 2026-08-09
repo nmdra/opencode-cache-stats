@@ -28,19 +28,17 @@ A cache write is a one-time priming cost. It is excluded from the hit ratio. The
 
 ## Install
 
-1. Copy the plugin into `~/.config/opencode/tui-plugins/`.
-2. Register the plugin in `~/.config/opencode/tui.json`:
+Install the plugin from this repository with the opencode CLI:
 
-```json
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["./tui-plugins/cache-stats.tsx"]
-}
+```
+opencode plugin -g "opencode-cache-stats@git+https://github.com/nmdra/opencode-cache-stats.git"
 ```
 
-The repo keeps a copy of `tui.json` as `tui.json.example`.
+The `-g` flag installs for every project. Omit it to install for the current project only. `opencode plug` is an alias for `opencode plugin`.
 
-After you change `tui.json`, restart [opencode](https://opencode.ai). Then run the `/cache-stats` command inside a session.
+Update with `-f` (\"Replace existing plugin version\"), pin a release with `#vX.Y.Z`, and remove the plugin by deleting its entry from `tui.json`.
+
+After you install, restart [opencode](https://opencode.ai). Then run the `/cache-stats` command inside a session.
 
 ## Documentation
 

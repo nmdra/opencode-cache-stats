@@ -24,4 +24,4 @@ The plugin shows a verdict word and a color for the rate. The word is `Excellent
 - `docs/colors.md` — how the plugin shows the rate with colors
 - `docs/troubleshooting.md` — how to fix common errors
 
-Read `docs/installation.md` first.
+Read `docs/installation.md` first. It installs the plugin from this GitHub repository with the command `opencode plugin`.

@@ -22,7 +22,7 @@ The plugin loads at opencode startup. If the plugin was not installed before the
 
 Restart opencode. Then run `/cache-stats` again.
 
-Make sure that the path in `tui.json` is correct. The path must point to `cache-stats.tsx`.
+Make sure that the entry in `tui.json` is present. The entry must name the package `opencode-cache-stats`. See `docs/installation.md`.
 
 ## The dialog shows `n/a`
 

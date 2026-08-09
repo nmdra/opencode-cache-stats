@@ -1,82 +1,51 @@
 # Install the plugin
 
-This guide is for Linux. The path for the opencode configuration is `~/.config/opencode`.
+Install the plugin from this GitHub repository with the opencode CLI. You do not copy files.
 
-## 1. Find the configuration folder
-
-1. Open a terminal.
-2. Run the command `echo $HOME` to find your home folder.
-
-The configuration folder is `$HOME/.config/opencode`.
-
-## 2. Copy the plugin file
-
-1. Go to the configuration folder.
+## 1. Install globally
 
 Run the command:
 
 ```
-cd ~/.config/opencode
+opencode plugin -g "opencode-cache-stats@git+https://github.com/nmdra/opencode-cache-stats.git"
 ```
 
-2. Create the folder `tui-plugins`.
+The command adds the plugin to `tui.json` in the global config folder (`~/.config/opencode`). Run it without `-g` to install for the current project only.
 
-Run the command:
+The command `opencode plug` is an alias for `opencode plugin`.
 
-```
-mkdir -p tui-plugins
-```
-
-3. Copy the file `cache-stats.tsx` from this repository into `tui-plugins`.
-
-```
-cp tui-plugins/cache-stats.tsx ~/.config/opencode/tui-plugins/cache-stats.tsx
-```
-
-4. Make sure that the file exists.
-
-Run the command:
-
-```
-ls ~/.config/opencode/tui-plugins/
-```
-
-The file `cache-stats.tsx` appears in the list.
-
-## 3. Register the plugin
-
-The file `tui.json` in the config folder lists the TUI plugins. This plugin must be on that list.
-
-1. Open the file `tui.json` with a text editor.
-
-```
-code ~/.config/opencode/tui.json
-```
-
-If the file does not exist, create a new file with this name.
-
-2. Add the path `"./tui-plugins/cache-stats.tsx"` to the list of plugins.
-
-Use the example file `tui.json.example` in this repository as a starting point. The registration looks like this:
-
-```json
-{
-  "plugin": ["./tui-plugins/cache-stats.tsx"]
-}
-```
-
-3. Save the file, then close the editor.
-
-## 4. Restart opencode
+## 2. Restart opencode
 
 1. Close the opencode program.
 2. Start the opencode program again.
 
 The plugin loads when opencode starts.
 
-## 5. Test the plugin
+## 3. Test the plugin
 
 1. Open a session.
 2. Run the command `/cache-stats`.
 
 If the dialog appears, the plugin works. If it does not appear, read `docs/troubleshooting.md`.
+
+## Update the plugin
+
+Run the command again with the flag `-f`:
+
+```
+opencode plugin -g -f "opencode-cache-stats@git+https://github.com/nmdra/opencode-cache-stats.git"
+```
+
+## Pin a version
+
+Add a release tag to the URL to install a fixed version:
+
+```
+opencode plugin -g "opencode-cache-stats@git+https://github.com/nmdra/opencode-cache-stats.git#v0.1.0"
+```
+
+## Remove the plugin
+
+1. Open the file `tui.json` in the config folder with a text editor.
+2. Remove the entry `opencode-cache-stats@git+https://github.com/nmdra/opencode-cache-stats.git` from the `plugin` list.
+3. Save the file, then restart opencode.
