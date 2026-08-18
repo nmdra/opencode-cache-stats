@@ -21,9 +21,9 @@ The dialog has seven sections. A footer shows the color levels at the bottom.
 
 - **The header.** This section shows the title `Cache stats`. The session title follows it. It shows the key `esc` on the right.
 - **The highlight.** This section shows the overall cache rate with a hit bar.
-- **The session summary.** This section shows the total calls, the model count, the subagent count, the total tokens, and the total cost.
+- **The session summary.** This section shows the total requests, the model count, the subagent count, the total tokens, and the total cost.
 - **The models.** This section lists the models of the session. Each row shows a hit bar, the hit rate, and the total tokens of the model.
-- **The totals.** This section shows grouped totals for tokens, calls, and cost. It shows averages per call.
+- **The totals.** This section shows grouped totals for tokens, requests, and cost. It shows averages per request.
 - **The subagents.** This section lists the subagents of the session. Each subagent has a child row. The child row shows the model of the subagent and its tokens.
 - **The footer.** This shows the label `CH Levels` and the color levels with a dot for each level.
 
@@ -37,19 +37,19 @@ A high rate means that many tokens come from the cache. A low rate means that ma
 
 The models section shows one row per model. Each row has a bar. The bar shows how much of the input came from the cache. The filled cells of the bar use the color of the hit level. Next to the bar the row shows the hit rate and the total tokens of the model.
 
-The dialog sorts the models by cache hit rate. The model with the highest rate is first. If two models have the same rate, the model with the most calls is first.
+The dialog sorts the models by cache hit rate. The model with the highest rate is first. If two models have the same rate, the model with the most requests is first.
 
 ## The totals section
 
-The totals section groups the metrics. The group `Tokens` shows the fresh input, the cache read, the output, the reasoning, and the cache-write tokens. Each value has a percentage. The percentage is the share of all tokens in the session. The group `Calls` shows the total calls, the cache hits, the cache misses, and a cache-efficiency bar. The group `Cost` shows the total cost.
+The totals section groups the metrics. The group `Tokens` shows the fresh input, the cache read, the output, the reasoning, and the cache-write tokens. Each value has a percentage. The percentage is the share of all tokens in the session. The group `Requests` shows the total requests, the cache hits, the cache misses, and a cache-efficiency bar. The group `Cost` shows the total cost.
 
-The group `Avg per Call` shows the averages per call. The averages are the totals divided by the number of calls.
+The group `Avg per Request` shows the averages per request. The averages are the totals divided by the number of requests.
 
-The totals add the values of every call in the session. The values grow as the session grows. A cache read total can be much larger than the context window. This is correct. Every call re-reads the same cached prefix. The values are not a snapshot of the current context.
+The totals add the values of every request in the session. The values grow as the session grows. A cache read total can be much larger than the context window. This is correct. Every request re-reads the same cached prefix. The values are not a snapshot of the current context.
 
 ## The subagents section
 
-The subagents section shows one parent row per subagent. The row shows the subagent name, a short id, its cache rate, and its cache-hit ratio. A child row below shows the model of the subagent and its total tokens. The model is the model with the most calls. The child row has a muted color.
+The subagents section shows one parent row per subagent. The row shows the subagent name, a short id, its cache rate, and its cache-hit ratio. A child row below shows the model of the subagent and its total tokens. The model is the model with the most requests. The child row has a muted color.
 
 The dialog sorts the subagents by cache hit rate. The subagent with the highest rate is first.
 

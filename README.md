@@ -13,9 +13,9 @@
 The dialog shows:
 
 - The overall cache hit percentage of the active session. A hit bar and a verdict word (Excellent, Good, Fair, or Poor) show the level.
-- A session summary: total calls, model count, subagent count, total tokens, and total cost.
+- A session summary: total requests, model count, subagent count, total tokens, and total cost.
 - A per-model breakdown with hit bars, hit percentages, and token totals.
-- Grouped totals for tokens, calls, and cost. The totals include percentages and averages per call.
+- Grouped totals for tokens, requests, and cost. The totals include percentages and averages per request.
 - A subagent list with the hit rate of each subagent and the model that each subagent used.
 
 The plugin computes the cache hit rate with this formula:
@@ -24,7 +24,7 @@ The plugin computes the cache hit rate with this formula:
 hit = cache read / (input + cache read)
 ```
 
-A cache write is a one-time priming cost. It is excluded from the hit ratio. The plugin also reports the number of API calls that read from the cache.
+A cache write is a one-time priming cost. It is excluded from the hit ratio. The plugin also reports the number of API requests that read from the cache.
 
 ## Install
 

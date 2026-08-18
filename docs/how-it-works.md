@@ -6,13 +6,13 @@ This guide explains how the plugin collects the data. It describes how the plugi
 
 The plugin reads the token data from the current session. It reads the same data from the child sessions. A child session is a subagent.
 
-## The API calls
+## The API requests
 
-An assistant message can contain many provider steps. Each step is one API call. The plugin reads the step data from the message parts. It looks for parts of the type `step-finish`.
+An assistant message can contain many provider steps. Each step is one API request. The plugin reads the step data from the message parts. It looks for parts of the type `step-finish`.
 
 When the parts have no step data, the plugin reads the totals of the whole assistant message. The step data is more exact than the message totals.
 
-The plugin counts the API calls. It also counts the calls that read from the cache and the calls that write to the cache.
+The plugin counts the API requests. It also counts the requests that read from the cache and the requests that write to the cache.
 
 ## The messages
 
@@ -24,12 +24,12 @@ The plugin ignores the messages of the user. A user message has no tokens. The s
 
 The plugin reads four values from the assistant messages.
 
-- `input` is the number of input tokens that are not served from the cache. The dialog calls it the fresh input.
+- `input` is the number of input tokens that are not served from the cache. The dialog refers to it as the fresh input.
 - `cache read` is the number of tokens that came from the cache.
 - `cache write` is the number of tokens written to the cache.
 - `reasoning` is the number of reasoning tokens.
 
-The plugin adds the values of the main session. Then it adds the values of each subagent. The totals are cumulative over every call in the session. A long session can show a cache read total that is much larger than the context window. Every call re-reads the same cached prefix, so the cache read count grows with each call.
+The plugin adds the values of the main session. Then it adds the values of each subagent. The totals are cumulative over every request in the session. A long session can show a cache read total that is much larger than the context window. Every request re-reads the same cached prefix, so the cache read count grows with each request.
 
 ## The rate formula
 

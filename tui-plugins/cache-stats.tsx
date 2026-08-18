@@ -19,16 +19,16 @@ type Acc = {
   cacheWrite: number;
   cost: number;
   count: number;
-  calls: number;
-  callsWithCacheRead: number;
+  reqs: number;
+  reqsWithCacheRead: number;
 };
 
 type Sub = {
   id: string;
   name: string;
   hit: number;
-  calls: number;
-  callsWithCacheRead: number;
+  reqs: number;
+  reqsWithCacheRead: number;
   tokens: number;
   cost: number;
   model?: string;
@@ -175,8 +175,8 @@ function newAcc(): Acc {
     cacheWrite: 0,
     cost: 0,
     count: 0,
-    calls: 0,
-    callsWithCacheRead: 0,
+    reqs: 0,
+    reqsWithCacheRead: 0,
   };
 }
 
@@ -248,7 +248,7 @@ type Msg = {
   parts?: Part[];
 };
 
-type Call = { tokens?: Tokens; cost?: number; model?: ModelRef };
+type Req = { tokens?: Tokens; cost?: number; model?: ModelRef };
 
 function normalizeMsg(m: Msg): NormalizedMsg {
   const info = m.info;
@@ -279,7 +279,7 @@ function normalizeMsg(m: Msg): NormalizedMsg {
   };
 }
 
-function collectCalls(m: Msg, nm: NormalizedMsg): Call[] {
+function collectReqs(m: Msg, nm: NormalizedMsg): Req[] {
   const parts = m.parts ?? [];
   const steps = parts.filter((p) => p.type === "step-finish");
   if (steps.length > 0) {
@@ -292,8 +292,8 @@ function collectCalls(m: Msg, nm: NormalizedMsg): Call[] {
   return [{ tokens: nm.tokens, cost: nm.cost, model: nm.model }];
 }
 
-function accCall(acc: Acc, call: Call): void {
-  const t = call.tokens;
+function accReq(acc: Acc, req: Req): void {
+  const t = req.tokens;
   if (!t) return;
   const input = safe(t.input);
   const cacheRead = safe(t.cache?.read);
@@ -303,9 +303,9 @@ function accCall(acc: Acc, call: Call): void {
   acc.reasoning += safe(t.reasoning);
   acc.cacheRead += cacheRead;
   acc.cacheWrite += cacheWrite;
-  acc.cost += safe(call.cost);
-  acc.calls += 1;
-  if (cacheRead > 0) acc.callsWithCacheRead += 1;
+  acc.cost += safe(req.cost);
+  acc.reqs += 1;
+  if (cacheRead > 0) acc.reqsWithCacheRead += 1;
 }
 
 function mergeAcc(dst: Acc, src: Acc): void {
@@ -316,8 +316,8 @@ function mergeAcc(dst: Acc, src: Acc): void {
   dst.cacheWrite += src.cacheWrite;
   dst.cost += src.cost;
   dst.count += src.count;
-  dst.calls += src.calls;
-  dst.callsWithCacheRead += src.callsWithCacheRead;
+  dst.reqs += src.reqs;
+  dst.reqsWithCacheRead += src.reqsWithCacheRead;
 }
 function mergeModel(dst: Map<string, Acc>, src: Map<string, Acc>): void {
   for (const [k, v] of src) {
@@ -353,12 +353,12 @@ function agentName(child: SessionChild): string {
 
 function dominantModel(m: Map<string, Acc>): string | undefined {
   let best: string | undefined;
-  let bestCalls = 0;
+  let bestReqs = 0;
   for (const [key, acc] of m) {
     if (short(key) === "?") continue;
-    if (acc.calls > bestCalls) {
+    if (acc.reqs > bestReqs) {
       best = key;
-      bestCalls = acc.calls;
+      bestReqs = acc.reqs;
     }
   }
   return best;
@@ -446,14 +446,14 @@ async function collect(
     if (!m || signal.aborted) continue;
     const nm = normalizeMsg(m);
     if (nm.role !== "assistant") continue;
-    for (const call of collectCalls(m, nm)) {
-      const key = keyFor(call.model, nm);
+    for (const req of collectReqs(m, nm)) {
+      const key = keyFor(req.model, nm);
       let p = perModel.get(key);
       if (!p) {
         p = newAcc();
         perModel.set(key, p);
       }
-      accCall(p, call);
+      accReq(p, req);
     }
     acc.count += 1;
   }
@@ -479,8 +479,8 @@ async function collect(
       id: cid,
       name: sanitize(agentName(child)) || cid,
       hit: hitPct(childStats.acc),
-      calls: childStats.acc.calls,
-      callsWithCacheRead: childStats.acc.callsWithCacheRead,
+      reqs: childStats.acc.reqs,
+      reqsWithCacheRead: childStats.acc.reqsWithCacheRead,
       tokens: tokenTotal(childStats.acc),
       cost: childStats.acc.cost,
       model: dominantModel(childStats.perModel),
@@ -542,8 +542,8 @@ function SummarySection(props: {
         <box flexDirection="column" gap={0}>
           <SummaryRow
             theme={theme}
-            label="Total Calls"
-            value={String(acc.calls).padStart(VAL_COL)}
+            label="Total Requests"
+            value={String(acc.reqs).padStart(VAL_COL)}
           />
           <SummaryRow
             theme={theme}
@@ -675,7 +675,7 @@ function ModelsSection(props: {
 function deriveTotals(acc: Acc): { efficiencyPct: number } {
   return {
     efficiencyPct:
-      acc.calls > 0 ? (100 * acc.callsWithCacheRead) / acc.calls : -1,
+      acc.reqs > 0 ? (100 * acc.reqsWithCacheRead) / acc.reqs : -1,
   };
 }
 
@@ -731,19 +731,19 @@ function TotalsSection(props: { theme: Theme; acc: Acc; subagents: number }) {
           valueColor={theme.warning}
           suffix={pctSuffix(acc.cacheWrite, total)}
         />
-        <GroupLabel theme={theme} title="Calls" />
-        <TreeRow theme={theme} label="Total" value={String(acc.calls)} />
+        <GroupLabel theme={theme} title="Requests" />
+        <TreeRow theme={theme} label="Total" value={String(acc.reqs)} />
         <TreeRow
           theme={theme}
           label="Cache Hits"
-          value={String(acc.callsWithCacheRead)}
-          suffix={pctSuffix(acc.callsWithCacheRead, acc.calls)}
+          value={String(acc.reqsWithCacheRead)}
+          suffix={pctSuffix(acc.reqsWithCacheRead, acc.reqs)}
         />
         <TreeRow
           theme={theme}
           label="Cache Misses"
-          value={String(acc.calls - acc.callsWithCacheRead)}
-          suffix={pctSuffix(acc.calls - acc.callsWithCacheRead, acc.calls)}
+          value={String(acc.reqs - acc.reqsWithCacheRead)}
+          suffix={pctSuffix(acc.reqs - acc.reqsWithCacheRead, acc.reqs)}
         />
         <TreeRow
           theme={theme}
@@ -765,32 +765,32 @@ function TotalsSection(props: { theme: Theme; acc: Acc; subagents: number }) {
           label="Total Cost"
           value={fmtCost(acc.cost, 5)}
         />
-        {acc.calls > 0 ? (
+        {acc.reqs > 0 ? (
           <>
-            <GroupLabel theme={theme} title="Avg per Call" />
+            <GroupLabel theme={theme} title="Avg per Request" />
             <TreeRow
               theme={theme}
               label="Fresh Input"
-              value={fmt(acc.input / acc.calls)}
+              value={fmt(acc.input / acc.reqs)}
               valueColor={theme.syntaxNumber}
             />
             <TreeRow
               theme={theme}
               label="Cache Read"
-              value={fmt(acc.cacheRead / acc.calls)}
+              value={fmt(acc.cacheRead / acc.reqs)}
               valueColor={theme.info}
             />
             <TreeRow
               theme={theme}
               label="Output"
-              value={fmt(acc.output / acc.calls)}
+              value={fmt(acc.output / acc.reqs)}
               valueColor={theme.syntaxNumber}
             />
             <TreeRow
               theme={theme}
               last
               label="Cost"
-              value={fmtCost(acc.cost / acc.calls, 5)}
+              value={fmtCost(acc.cost / acc.reqs, 5)}
             />
           </>
         ) : null}
@@ -799,7 +799,7 @@ function TotalsSection(props: { theme: Theme; acc: Acc; subagents: number }) {
           wrapMode="none"
           style={{ attributes: TextAttributes.ITALIC }}
         >
-          totals are cumulative over all calls
+          totals are cumulative over all requests
         </text>
       </box>
     </>
@@ -853,11 +853,11 @@ function SubagentRow(props: { theme: Theme; sub: Sub }) {
             {fmtHit(sub.hit).padStart(HIT_COL)}
           </span>
         </b>
-        {sub.calls > 0 ? (
+        {sub.reqs > 0 ? (
           <b>
             <span style={{ fg: theme.textMuted }}>
               {" "}
-              {`${String(sub.callsWithCacheRead)}/${String(sub.calls)}`.padStart(RATIO_COL)}{" "}
+              {`${String(sub.reqsWithCacheRead)}/${String(sub.reqs)}`.padStart(RATIO_COL)}{" "}
               hit
             </span>
           </b>
@@ -1025,7 +1025,7 @@ function CacheStatsView(props: {
             </span>
           </b>
         </text>
-        <text fg={theme.textMuted}>{acc.calls > 0 ? "↑/↓ · esc" : "esc"}</text>
+        <text fg={theme.textMuted}>{acc.reqs > 0 ? "↑/↓ · esc" : "esc"}</text>
       </box>
       <text fg={theme.borderSubtle} wrapMode="none">
         {SEPARATOR}
@@ -1042,7 +1042,7 @@ function CacheStatsView(props: {
           scroll = r as ScrollHandle;
         }}
       >
-        {acc.calls === 0 ? (
+        {acc.reqs === 0 ? (
           <EmptyState
             theme={theme}
             title={props.title}
@@ -1124,9 +1124,9 @@ async function showCache(api: TuiPluginApi): Promise<void> {
     if (api.lifecycle.signal.aborted) return;
 
     const sorted = [...perModel.entries()].sort(
-      (a, b) => hitPct(b[1]) - hitPct(a[1]) || b[1].calls - a[1].calls,
+      (a, b) => hitPct(b[1]) - hitPct(a[1]) || b[1].reqs - a[1].reqs,
     );
-    subs.sort((a, b) => b.hit - a.hit || b.calls - a.calls);
+    subs.sort((a, b) => b.hit - a.hit || b.reqs - a.reqs);
 
     api.ui.dialog.setSize("medium");
     api.ui.dialog.replace(() => (
