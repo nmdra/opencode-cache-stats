@@ -22,7 +22,11 @@ The plugin loads at opencode startup. If the plugin was not installed before the
 
 Restart opencode. Then run `/cache-stats` again.
 
-Make sure that the path in `tui.json` is correct. The path must point to `cache-stats.tsx`.
+Check the plugin path for your opencode version.
+
+On opencode v1, the path in `tui.json` must point to `cache-stats.tsx`. For example: `"./tui-plugins/cache-stats.tsx"`.
+
+On opencode v2, the folder `~/.config/opencode/plugins/cache-stats/` must contain a file named `tui.tsx`. opencode v2 skips a path in `tui.json` without an error. It also skips a file path in the `plugins` list of `cli.json` without an error.
 
 ## The dialog shows `n/a`
 
@@ -33,6 +37,8 @@ Do a session with an AI model. Then run `/cache-stats` again. A session before t
 ## The dialog shows wrong numbers
 
 The plugin reads the data from the session. It reads from the API first. If the API fails, it reads from the local state. The two reads have different numbers.
+
+On opencode v2, the local state keeps only the newest messages of a session. The numbers from the local state can be incomplete.
 
 Run the command again after the reply finishes. A reply that still runs gives partial numbers.
 
