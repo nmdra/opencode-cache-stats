@@ -1,17 +1,45 @@
 /** @jsxImportSource @opentui/solid */
-import { useKeyboard } from "@opentui/solid";
+import { useKeyboard, type JSX } from "@opentui/solid";
 import { TextAttributes } from "@opentui/core";
 import type {
   TuiPlugin,
   TuiPluginModule,
   TuiPluginApi,
 } from "@opencode-ai/plugin/tui";
+import type { Plugin } from "@opencode/plugin/tui";
+import type {
+  MessageListInput,
+  SessionInfo,
+  SessionListInput,
+  SessionMessageInfo,
+  SessionMessagesResponse,
+  SessionsResponse,
+} from "@opencode/client";
 
-type Theme = TuiPluginApi["theme"]["current"];
+// The plugin runs on opencode v1 (tui) and on opencode v2 (setup). Each
+// host provides only its own opencode packages at runtime, and both
+// provide @opentui, so every opencode import above is type-only.
+
+// The theme colors that the dialog uses. The v1 theme has them as they
+// are; palette() maps a v2 theme onto them.
+type Theme = Pick<
+  TuiPluginApi["theme"]["current"],
+  | "text"
+  | "textMuted"
+  | "primary"
+  | "accent"
+  | "secondary"
+  | "success"
+  | "info"
+  | "warning"
+  | "error"
+  | "borderSubtle"
+  | "syntaxNumber"
+>;
 
 type RGBA = TuiPluginApi["theme"]["current"]["primary"];
 
-type Acc = {
+export type Acc = {
   input: number;
   output: number;
   reasoning: number;
@@ -240,6 +268,7 @@ type Msg = {
   };
   role?: string;
   type?: string;
+  time?: { created?: number };
   tokens?: Tokens;
   cost?: number;
   providerID?: string;
@@ -279,7 +308,34 @@ function normalizeMsg(m: Msg): NormalizedMsg {
   };
 }
 
-function collectReqs(m: Msg, nm: NormalizedMsg): Req[] {
+// A v2 compaction without its own model ran on the session's model at
+// the time: the model of the last assistant request or model switch
+// before it.
+function modelAt(messages: Msg[], time: number | undefined): ModelRef | undefined {
+  if (time === undefined) return undefined;
+  let best: Msg | undefined;
+  for (const m of messages) {
+    const created = m?.time?.created;
+    if (m?.type !== "assistant" && m?.type !== "model-switched") continue;
+    if (created === undefined || created > time) continue;
+    if (!best || created > (best.time?.created ?? 0)) best = m;
+  }
+  return best?.model;
+}
+
+function collectReqs(m: Msg, nm: NormalizedMsg, messages: Msg[]): Req[] {
+  // opencode v2 keeps compaction usage in a message of its own. v1 stored
+  // a compaction as an assistant message, so it counts the same way.
+  if (nm.role === "compaction") {
+    if (!nm.tokens) return [];
+    return [
+      {
+        tokens: nm.tokens,
+        cost: nm.cost,
+        model: nm.model ?? modelAt(messages, m.time?.created),
+      },
+    ];
+  }
   const parts = m.parts ?? [];
   const steps = parts.filter((p) => p.type === "step-finish");
   if (steps.length > 0) {
@@ -410,9 +466,130 @@ async function fetchList<T>(
   return [];
 }
 
-async function collect(
+// Where collect() reads the messages and the subagent sessions of a
+// session. opencode v1 and v2 expose them through different APIs.
+type Source = {
+  messages: (sessionID: string) => Promise<Msg[]>;
+  children: (sessionID: string) => Promise<SessionChild[]>;
+};
+
+function v1Source(
   client: TuiPluginApi["client"],
   state: TuiPluginApi["state"],
+): Source {
+  return {
+    messages: (sessionID) =>
+      fetchList<Msg>(
+        () => client.session.messages({ sessionID }),
+        () => [...state.session.messages(sessionID)],
+        "messages",
+      ),
+    children: (sessionID) =>
+      fetchList<SessionChild>(
+        () => client.session.children({ sessionID }),
+        () =>
+          (state.session as unknown as StateSessionWithChildren).children?.(
+            sessionID,
+          ) ?? [],
+        "children",
+      ),
+  };
+}
+
+// The parts of the v2 plugin context that v2Source() reads.
+type RequestOptions = { readonly signal?: AbortSignal };
+
+export type V2Client = {
+  readonly message: {
+    list: (
+      input: MessageListInput,
+      options?: RequestOptions,
+    ) => Promise<SessionMessagesResponse>;
+  };
+  readonly session: {
+    list: (
+      input?: SessionListInput,
+      options?: RequestOptions,
+    ) => Promise<SessionsResponse>;
+  };
+};
+
+export type V2Cache = {
+  readonly session: {
+    list: () => SessionInfo[];
+    readonly message: { list: (sessionID: string) => SessionMessageInfo[] };
+  };
+};
+
+const PAGE = 200;
+
+type Page<T> = { data: T[]; cursor: { next?: string | null } };
+
+// Follows cursor.next until a short or empty page, or a cursor that
+// repeats. The server rejects a cursor combined with order, and a cursor
+// already carries the filters of the first page, so later pages pass
+// only the cursor.
+async function readAll<T>(
+  page: (cursor?: string) => Promise<Page<T>>,
+  signal: AbortSignal,
+): Promise<T[]> {
+  const out: T[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await page(cursor);
+    out.push(...res.data);
+    const next =
+      res.data.length < PAGE ? undefined : (res.cursor.next ?? undefined);
+    cursor = next === cursor ? undefined : next;
+  } while (cursor && !signal.aborted);
+  return out;
+}
+
+// The v2 local cache holds only the newest messages of a session, so it
+// is a fallback for a failed server request, as the v1 state is.
+function v2Source(
+  client: V2Client,
+  data: V2Cache,
+  signal: AbortSignal,
+): Source {
+  return {
+    messages: (sessionID) =>
+      fetchList<Msg>(
+        () =>
+          readAll(
+            (cursor) =>
+              client.message.list(
+                cursor
+                  ? { sessionID, cursor, limit: PAGE }
+                  : { sessionID, limit: PAGE },
+                { signal },
+              ),
+            signal,
+          ),
+        () => data.session.message.list(sessionID),
+        "messages",
+      ),
+    children: (sessionID) =>
+      fetchList<SessionChild>(
+        () =>
+          readAll(
+            (cursor) =>
+              client.session.list(
+                cursor
+                  ? { cursor, limit: PAGE }
+                  : { parentID: sessionID, limit: PAGE },
+                { signal },
+              ),
+            signal,
+          ),
+        () => data.session.list().filter((s) => s.parentID === sessionID),
+        "children",
+      ),
+  };
+}
+
+async function collect(
+  source: Source,
   sessionID: string,
   visited: Set<string>,
   signal: AbortSignal,
@@ -425,19 +602,8 @@ async function collect(
   // where each session has a single parent.
 
   const [messages, children] = await Promise.all([
-    fetchList<Msg>(
-      () => client.session.messages({ sessionID }),
-      () => state.session.messages(sessionID),
-      "messages",
-    ),
-    fetchList<SessionChild>(
-      () => client.session.children({ sessionID }),
-      () =>
-        (state.session as unknown as StateSessionWithChildren).children?.(
-          sessionID,
-        ) ?? [],
-      "children",
-    ),
+    source.messages(sessionID),
+    source.children(sessionID),
   ]);
 
   const acc = newAcc();
@@ -445,8 +611,8 @@ async function collect(
   for (const m of messages) {
     if (!m || signal.aborted) continue;
     const nm = normalizeMsg(m);
-    if (nm.role !== "assistant") continue;
-    for (const req of collectReqs(m, nm)) {
+    if (nm.role !== "assistant" && nm.role !== "compaction") continue;
+    for (const req of collectReqs(m, nm, messages)) {
       const key = keyFor(req.model, nm);
       let p = perModel.get(key);
       if (!p) {
@@ -467,7 +633,7 @@ async function collect(
     children.map(async (child) => {
       const cid = child?.id ?? "";
       if (!cid) return null;
-      const childStats = await collect(client, state, cid, visited, signal);
+      const childStats = await collect(source, cid, visited, signal);
       return { child, cid, childStats };
     }),
   );
@@ -973,6 +1139,7 @@ function CacheStatsView(props: {
   subagents: number;
   subs: Sub[];
   models: { key: string; acc: Acc }[];
+  bindPageKeys?: (page: (delta: number) => void) => void;
 }) {
   const theme = props.theme;
   const acc = props.acc;
@@ -981,9 +1148,18 @@ function CacheStatsView(props: {
   const cell = modelCellWidth(props.models);
 
   let scroll: ScrollHandle | undefined;
+  props.bindPageKeys?.((delta) => {
+    if (!scroll || scroll.scrollHeight <= scroll.height) return;
+    scroll.scrollBy(delta);
+  });
   useKeyboard((evt) => {
     if (!scroll) return;
     if (scroll.scrollHeight <= scroll.height) return;
+    if (
+      props.bindPageKeys &&
+      (evt.name === "pageup" || evt.name === "pagedown")
+    )
+      return;
     if (evt.name === "up") {
       scroll.scrollBy(-1);
       evt.preventDefault();
@@ -1088,17 +1264,114 @@ function CacheStatsView(props: {
   );
 }
 
+// Maps a v2 theme onto the v1 color names that the dialog uses. The
+// mapping follows opencode's own v1 theme migration (@opencode/theme).
+// v2 has no subtle border color, so the border color stands in for it.
+function palette(t: Plugin.Context["theme"]): Theme {
+  return {
+    text: t.text.base,
+    textMuted: t.text.muted,
+    primary: t.hue.interactive[200],
+    accent: t.hue.accent[200],
+    // For a theme migrated from v1, categorical[0] is its secondary hue.
+    secondary: t.categorical[0]?.[200] ?? t.hue.accent[200],
+    success: t.text.feedback.success.base,
+    info: t.text.feedback.info.base,
+    warning: t.text.feedback.warning.base,
+    error: t.text.feedback.error.base,
+    borderSubtle: t.border.base,
+    syntaxNumber: t.syntax.number,
+  };
+}
+
+// What showCache() needs from opencode. tui() builds it from the v1 API
+// and setup() from the v2 plugin context.
+type Host = {
+  sessionID: () => string | undefined;
+  session: (sessionID: string) => { title?: string } | undefined;
+  toast: (options: {
+    title: string;
+    message: string;
+    variant: "warning";
+  }) => void;
+  dialog: (render: () => JSX.Element) => void;
+  theme: () => Theme;
+  source: Source;
+  signal: AbortSignal;
+  // Binds PgUp/PgDn for the open dialog when the host's keymap would
+  // take them before useKeyboard sees them.
+  pageKeys?: (page: (delta: number) => void) => void;
+};
+
+function v1Host(api: TuiPluginApi): Host {
+  return {
+    sessionID() {
+      const route = api.route?.current;
+      const id = route?.name === "session" ? route.params?.sessionID : undefined;
+      return typeof id === "string" ? id : undefined;
+    },
+    session: (sessionID) => api.state.session.get(sessionID),
+    toast: (options) => api.ui.toast(options),
+    dialog(render) {
+      api.ui.dialog.setSize("medium");
+      api.ui.dialog.replace(render);
+    },
+    theme: () => api.theme.current,
+    source: v1Source(api.client, api.state),
+    signal: api.lifecycle.signal,
+  };
+}
+
+function v2Host(ctx: Plugin.Context, signal: AbortSignal): Host {
+  return {
+    sessionID() {
+      const route = ctx.ui.router.current();
+      return route.type === "session" ? route.sessionID : undefined;
+    },
+    session: (sessionID) => ctx.data.session.get(sessionID),
+    toast: (options) => ctx.ui.toast.show(options),
+    dialog(render) {
+      ctx.ui.dialog.show(render);
+      // Set the size explicitly, as the v1 path does with setSize().
+      ctx.ui.dialog.set({ size: "medium" });
+    },
+    theme: () => palette(ctx.theme.surface("dialog")),
+    source: v2Source(ctx.client, ctx.data, signal),
+    signal,
+    // opencode v2 binds PgUp/PgDn to session paging in a global layer
+    // that also closes the open dialog. A layer created by the dialog
+    // takes precedence and is removed with it.
+    pageKeys: (page) =>
+      ctx.keymap.layer(() => ({
+        mode: "modal",
+        priority: 1,
+        commands: [
+          {
+            bind: "pageup",
+            title: "Page up",
+            group: "Cache stats",
+            run: () => page(-PAGE_STEP),
+          },
+          {
+            bind: "pagedown",
+            title: "Page down",
+            group: "Cache stats",
+            run: () => page(PAGE_STEP),
+          },
+        ],
+      })),
+  };
+}
+
 let showInFlight = false;
 
-async function showCache(api: TuiPluginApi): Promise<void> {
+async function showCache(host: Host): Promise<void> {
   if (showInFlight) return;
   showInFlight = true;
   try {
-    const route = api.route?.current;
-    const sessionID =
-      route?.name === "session" ? route.params?.sessionID : undefined;
+    const sessionID = host.sessionID();
     if (!sessionID) {
-      api.ui.toast({
+      host.toast({
         title: "Cache stats",
         message: "No active session.",
         variant: "warning",
@@ -1108,35 +1381,34 @@ async function showCache(api: TuiPluginApi): Promise<void> {
 
     let title = "session";
     try {
-      const s = api.state.session.get(sessionID);
+      const s = host.session(sessionID);
       title = sanitize(s?.title || "session");
     } catch (err) {
       console.error("[cache-stats] session:", err);
     }
 
     const { acc, subagents, perModel, subs } = await collect(
-      api.client,
-      api.state,
+      host.source,
       sessionID,
       new Set(),
-      api.lifecycle.signal,
+      host.signal,
     );
-    if (api.lifecycle.signal.aborted) return;
+    if (host.signal.aborted) return;
 
     const sorted = [...perModel.entries()].sort(
       (a, b) => hitPct(b[1]) - hitPct(a[1]) || b[1].reqs - a[1].reqs,
     );
     subs.sort((a, b) => b.hit - a.hit || b.reqs - a.reqs);
 
-    api.ui.dialog.setSize("medium");
-    api.ui.dialog.replace(() => (
+    host.dialog(() => (
       <CacheStatsView
-        theme={api.theme.current}
+        theme={host.theme()}
         title={title}
         acc={acc}
         subagents={subagents}
         subs={subs}
         models={sorted.map(([key, m]) => ({ key, acc: m }))}
+        bindPageKeys={host.pageKeys}
       />
     ));
   } finally {
@@ -1144,6 +1416,7 @@ async function showCache(api: TuiPluginApi): Promise<void> {
   }
 }
 
+// opencode v1 entry point.
 const tui: TuiPlugin = async (api) => {
   api.keymap.registerLayer({
     commands: [
@@ -1154,12 +1427,39 @@ const tui: TuiPlugin = async (api) => {
         namespace: "palette",
         slashName: "cache-stats",
         run: () => {
-          void showCache(api);
+          void showCache(v1Host(api));
         },
       },
     ],
   });
 };
 
-const plugin: TuiPluginModule = { id: "nmdra.cache-stats", tui };
+// opencode v2 entry point. v2 has no lifecycle signal, so the cleanup
+// that setup() returns aborts a pending load.
+const setup: Plugin.Definition["setup"] = (ctx) => {
+  const ctrl = new AbortController();
+  ctx.keymap.layer(() => ({
+    mode: "global",
+    commands: [
+      {
+        id: "cache-stats.show",
+        title: "Cache stats",
+        group: "Plugin",
+        palette: true,
+        slash: { name: "cache-stats" },
+        run: () => showCache(v2Host(ctx, ctrl.signal)),
+      },
+    ],
+  }));
+  return () => ctrl.abort();
+};
+
+const plugin = {
+  id: "nmdra.cache-stats",
+  tui,
+  setup,
+} satisfies TuiPluginModule & Plugin.Definition;
 export default plugin;
+
+// Used by the tests.
+export { collect, v1Source, v2Source };
