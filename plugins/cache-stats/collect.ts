@@ -1,5 +1,5 @@
 import type { OpenCodeClient, SessionInfo } from "@opencode/client";
-import { dominantModel, hitPct, mergeAcc, mergeModels, sanitize, summarize, tokenTotal, type Acc } from "./stats.ts";
+import { dominantModel, hitPct, mergeAcc, mergeModels, mergeUsage, sanitize, summarize, tokenTotal, type UsageSummary } from "./stats.ts";
 
 export type CollectionClient = {
   session: Pick<OpenCodeClient["session"], "get" | "list">;
@@ -17,13 +17,24 @@ export type Sub = {
   model?: string;
 };
 
-export type Collected = {
-  title: string;
-  acc: Acc;
+export type Scope = "all" | "main" | "subagents";
+
+export type ScopeStats = UsageSummary & {
   subagents: number;
-  perModel: Map<string, Acc>;
   subs: Sub[];
 };
+
+export type Collected = ScopeStats & {
+  sessionID: string;
+  sessionIDs: string[];
+  title: string;
+  updatedAt: number;
+  scopes: { main: ScopeStats; subagents: ScopeStats };
+};
+
+export function selectScope(stats: Collected, scope: Scope): ScopeStats {
+  return scope === "all" ? stats : stats.scopes[scope];
+}
 
 type Page<T> = {
   data: T[];
@@ -84,16 +95,26 @@ export async function collect(
     requestSignal.throwIfAborted();
     const root = await client.session.get({ sessionID }, options);
     const seen = new Set([sessionID]);
+    let main = summarize([]);
+    const descendants = summarize([]);
     const tree: { info: SessionInfo; children: string[]; stats: ReturnType<typeof summarize> }[] = [];
     let pending = [root];
     while (pending.length) {
       const batch = await mapSessions(pending, async (info) => {
         const [messages, children] = await Promise.all([
           // The released 2.1.4 client exposes the timeline as client.message.list.
-          allPages((cursor) => client.message.list({
-            sessionID: info.id, limit: PAGE_SIZE, type: "assistant",
-            ...(cursor ? { cursor } : { order: "asc" as const }),
-          }, options), requestSignal),
+          (async () => {
+            const groups = [];
+            // Filter each timeline to avoid fetching prompts and tool outputs.
+            // Sequential types keep the global list-request limit at eight.
+            for (const type of ["assistant", "compaction"] as const) {
+              groups.push(await allPages((cursor) => client.message.list({
+                sessionID: info.id, limit: PAGE_SIZE, type,
+                ...(cursor ? { cursor } : { order: "asc" as const }),
+              }, options), requestSignal));
+            }
+            return groups.flat();
+          })(),
           allPages((cursor) => client.session.list({
             limit: PAGE_SIZE,
             ...(cursor ? { cursor } : { parentID: info.id, order: "asc" as const }),
@@ -110,18 +131,21 @@ export async function collect(
           childIDs.push(child.id);
           pending.push(child);
         }
-        tree.push({ info, children: childIDs, stats: summarize(messages) });
+        const stats = summarize(messages, info.id);
+        if (info.id === sessionID) main = stats;
+        else mergeUsage(descendants, stats);
+        tree.push({ info, children: childIDs, stats });
       }
     }
     requestSignal.throwIfAborted();
 
-    const totals = new Map<string, Omit<Collected, "subs">>();
+    type SessionTotal = Pick<ScopeStats, "acc" | "perModel" | "subagents">;
+    const totals = new Map<string, SessionTotal>();
     const subs: Sub[] = [];
     // Breadth-first discovery followed by reverse accumulation avoids recursive stack growth.
     for (const { info, children, stats } of tree.reverse()) {
-      const value: Omit<Collected, "subs"> = {
-        ...stats, title: sanitize(info.title || "session"), subagents: 0,
-      };
+      const value: SessionTotal = { acc: { ...stats.acc }, perModel: new Map(), subagents: 0 };
+      mergeModels(value.perModel, stats.perModel);
       for (const childID of children) {
         const child = totals.get(childID)!;
         value.subagents += 1 + child.subagents;
@@ -143,7 +167,18 @@ export async function collect(
       }
       totals.set(info.id, value);
     }
-    return { ...totals.get(sessionID)!, subs };
+    const all = summarize([]);
+    mergeUsage(all, main);
+    mergeUsage(all, descendants);
+    const subagents = totals.get(sessionID)!.subagents;
+    return {
+      ...all, sessionID, sessionIDs: [...seen], title: sanitize(root.title || "session"),
+      updatedAt: Date.now(), subagents, subs,
+      scopes: {
+        main: { ...main, subagents: 0, subs: [] },
+        subagents: { ...descendants, subagents, subs },
+      },
+    };
   } catch (error) {
     failed.abort();
     throw error;

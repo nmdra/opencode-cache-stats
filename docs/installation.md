@@ -9,11 +9,11 @@ From this repository's root, on Linux:
 ```sh
 config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
 mkdir -p "$config_dir/plugins/cache-stats"
-cp plugins/cache-stats/{package.json,tui.tsx,view.tsx,controller.ts,collect.ts,stats.ts} \
+cp plugins/cache-stats/{package.json,tui.tsx,view.tsx,presentation.ts,controller.ts,collect.ts,stats.ts,live.ts,report.ts,sidebar.tsx} \
   "$config_dir/plugins/cache-stats/"
 ```
 
-Keep all six files together. V2 loads plugin directories, not a configured path to an individual TSX file. OpenCode supplies the plugin and OpenTUI runtime imports; you do not need to run npm install in the copied directory.
+Keep all ten files together. V2 loads plugin directories, not a configured path to an individual TSX file. OpenCode supplies the plugin and OpenTUI runtime imports; you do not need to run npm install in the copied directory.
 
 ## 2. Enable the CLI plugin
 
@@ -29,6 +29,8 @@ Edit the global `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli
 See `cli.json.example`. The global `plugins/` directory is also discovered automatically. Do not register this terminal-only plugin in `opencode.json` or in the old `tui.json`.
 
 V2 CLI configuration is global; there is no project-local `cli.json`. Because this is a CLI-only plugin, it remains available when your terminal connects to a remote server.
+
+The sidebar indicator is enabled by default. Disable it with `{"package":"./plugins/cache-stats","options":{"sidebar":false}}` in the `plugins` array. It does not force OpenCode's sidebar to become visible.
 
 ## 3. Load and test
 

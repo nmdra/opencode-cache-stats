@@ -1,4 +1,4 @@
-import type { SessionMessageInfo } from "@opencode/client";
+import type { SessionMessageInfo, TokenUsageInfo } from "@opencode/client";
 
 export type Acc = {
   input: number;
@@ -10,6 +10,23 @@ export type Acc = {
   count: number;
   reqs: number;
   reqsWithCacheRead: number;
+};
+
+export const RECENT_LIMIT = 25;
+
+export type RequestSample = {
+  id: string;
+  sessionID: string;
+  at: number;
+  model: string;
+  usage: Acc;
+};
+
+export type UsageSummary = {
+  acc: Acc;
+  perModel: Map<string, Acc>;
+  compaction: Acc;
+  recent: RequestSample[];
 };
 
 export function newAcc(): Acc {
@@ -47,34 +64,55 @@ export function mergeModels(target: Map<string, Acc>, source: Map<string, Acc>):
   }
 }
 
-export function summarize(messages: readonly SessionMessageInfo[]) {
+function recordedUsage(tokens: TokenUsageInfo, cost?: number): Acc {
+  return {
+    ...newAcc(),
+    input: safe(tokens.input), output: safe(tokens.output), reasoning: safe(tokens.reasoning),
+    cacheRead: safe(tokens.cache.read), cacheWrite: safe(tokens.cache.write), cost: safe(cost),
+    reqs: 1, reqsWithCacheRead: safe(tokens.cache.read) > 0 ? 1 : 0,
+  };
+}
+
+export function recentRequests(samples: readonly RequestSample[]): RequestSample[] {
+  return [...samples].sort((a, b) => a.at - b.at || a.sessionID.localeCompare(b.sessionID) || a.id.localeCompare(b.id)).slice(-RECENT_LIMIT);
+}
+
+export function mergeUsage(target: UsageSummary, source: UsageSummary): void {
+  mergeAcc(target.acc, source.acc);
+  mergeModels(target.perModel, source.perModel);
+  mergeAcc(target.compaction, source.compaction);
+  target.recent = recentRequests([...target.recent, ...source.recent]);
+}
+
+export function summarize(messages: readonly SessionMessageInfo[], sessionID = ""): UsageSummary {
   const acc = newAcc();
+  const compaction = newAcc();
   const perModel = new Map<string, Acc>();
+  const recent: RequestSample[] = [];
   const seen = new Set<string>();
   for (const message of messages) {
     if (seen.has(message.id)) continue;
     seen.add(message.id);
-    // Compaction has its own usage in V2; this dialog measures assistant steps only.
+    // Keep auxiliary compaction usage separate from assistant request counts.
+    if (message.type === "compaction") {
+      compaction.count++;
+      if (message.status !== "running" && message.tokens) {
+        mergeAcc(compaction, recordedUsage(message.tokens, message.cost));
+      }
+      continue;
+    }
     if (message.type !== "assistant") continue;
     acc.count++;
     if (!message.tokens) continue;
-    const tokens = message.tokens;
-    const usage = newAcc();
-    usage.input = safe(tokens.input);
-    usage.output = safe(tokens.output);
-    usage.reasoning = safe(tokens.reasoning);
-    usage.cacheRead = safe(tokens.cache.read);
-    usage.cacheWrite = safe(tokens.cache.write);
-    usage.cost = safe(message.cost);
-    usage.reqs = 1;
-    usage.reqsWithCacheRead = usage.cacheRead > 0 ? 1 : 0;
+    const usage = recordedUsage(message.tokens, message.cost);
     mergeAcc(acc, usage);
     const key = `${message.model.providerID}/${message.model.id}`;
     const model = perModel.get(key) ?? newAcc();
     mergeAcc(model, usage);
     perModel.set(key, model);
+    recent.push({ id: message.id, sessionID, at: safe(message.time.completed ?? message.time.created), model: key, usage });
   }
-  return { acc, perModel };
+  return { acc, perModel, compaction, recent: recentRequests(recent) };
 }
 
 export function dominantModel(models: Map<string, Acc>): string | undefined {

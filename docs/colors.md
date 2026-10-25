@@ -20,13 +20,13 @@ The plugin shows a word next to the rate. The word uses the same colors:
 - `Good` for 70% to 89%
 - `Fair` for 40% to 69%
 - `Poor` for below 40%
-- `—` for no rate
+- `No rate` when usage is unavailable
 
 ## The bars
 
-Each model row has a bar. The bar shows how much of the input came from the cache. The filled cells use the color of the rate. The empty cells use the border color.
+The overall and model bars split the input into two colors: **green/success for cache hits** and **red/error for cache misses**. These segment colors stay distinct even when the verdict is Fair or Poor. The overall row also shows the numeric miss percentage.
 
-A bar of all filled cells means the whole input came from the cache. A bar of all empty cells means none of the input came from the cache.
+Partial cells use eighth-cell precision, with a green glyph over a red background. This keeps a small miss rate such as 1.3% visible instead of rounding the whole bar to green. Numeric percentages remain the authoritative values. Zero hits gives an all-red bar; all hits gives an all-green bar. Missing usage uses neutral dots, not a red miss bar.
 
 ## Where the colors appear
 
@@ -34,7 +34,7 @@ The overall rate uses these colors. Each model rate uses these colors. Each suba
 
 The other values have their own theme colors. The cache read number uses the info color. The cache write number uses the warning color. The token counts and the cost have their own colors.
 
-The footer repeats the color levels with a dot for each level: `● ≥90%` in the success color, `● 70–89%` in the info color, `● 40–69%` in the warning color, and `● <40%` in the error color.
+Help (**h**) lists the verdict thresholds and explains the hit/miss segment colors. Recent-request glyphs remain separated so a high-hit run does not become a solid rectangle.
 
 ## The theme
 

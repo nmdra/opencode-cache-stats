@@ -6,7 +6,7 @@ This branch targets OpenCode **2.1.4**. For OpenCode V1, use the [`v1` branch](h
 
 > Run the `/cache-stats` command (or the `cache-stats.show` command) inside a session to open the dialog.
 
-The screenshots below show the previous V1 layout; V2 keeps the same sections.
+The screenshots below show the legacy V1 layout. V2 uses a compact tabbed dialog.
 
 | Summary and models | Totals breakdown | Subagents |
 |:---:|:---:|:---:|
@@ -21,6 +21,9 @@ The dialog shows:
 - A per-model breakdown with hit bars, hit percentages, and token totals.
 - Grouped totals for tokens, requests, and cost. The totals include percentages and averages per request.
 - A subagent list with the hit rate of each subagent and the model that each subagent used.
+- Live refresh, with **All / Main / Subagents** filters and a trend for the latest 25 recorded requests.
+- Compaction tokens and cost in a separate section, without changing assistant-only request totals.
+- A sidebar cache indicator and Markdown/JSON clipboard reports.
 
 The plugin computes the cache hit rate with this formula:
 
@@ -30,7 +33,11 @@ hit = cache read / (input + cache read)
 
 A cache write is a one-time priming cost. It is excluded from the hit ratio. The plugin also reports the number of API requests that read from the cache.
 
-Requests mean assistant steps with recorded usage, not individual retry attempts. Totals include the active session and all descendants, including history before compaction. Compaction, title generation, and other auxiliary model calls are excluded. The dialog is a snapshot; reopen it to refresh.
+Requests mean assistant steps with recorded usage, not individual retry attempts. **All** includes the active session and all descendants, including history before compaction. Compaction is reported separately; title generation and other auxiliary calls are excluded. The open dialog refreshes at step boundaries and marks retained data as stale if a refresh fails.
+
+The popup opens on **Summary**, with compact totals and a spaced recent-request trend. **Tab** / **Shift+Tab** switch between Summary, Models, Usage, and Agents. The scope filter, overall cached token hit rate, and status stay visible while scrolling. Empty compaction sections and repeated accounting notes are omitted; details remain available in Help.
+
+**f** cycles scope, **r** refreshes, **m** copies Markdown, **j** copies JSON, and **h** opens help. Up/Down and Page Up/Page Down scroll; Home/End jump; Escape closes. Reports cover the whole selected scope, regardless of the visible tab. Exports require terminal OSC 52 clipboard support and include session metadata but no prompts, tool outputs, or compaction summaries.
 
 ## Install
 
@@ -38,7 +45,7 @@ Requests mean assistant steps with recorded usage, not individual retry attempts
 
 ```sh
 mkdir -p ~/.config/opencode/plugins/cache-stats
-cp plugins/cache-stats/{package.json,tui.tsx,view.tsx,controller.ts,collect.ts,stats.ts} \
+cp plugins/cache-stats/{package.json,tui.tsx,view.tsx,presentation.ts,controller.ts,collect.ts,stats.ts,live.ts,report.ts,sidebar.tsx} \
   ~/.config/opencode/plugins/cache-stats/
 ```
 
@@ -54,6 +61,14 @@ cp plugins/cache-stats/{package.json,tui.tsx,view.tsx,controller.ts,collect.ts,s
 Use `$XDG_CONFIG_HOME/opencode` instead when `XDG_CONFIG_HOME` is set. OpenCode also discovers this global plugin directory automatically; the explicit entry makes enablement clear. No server plugin or npm installation is needed for this local install.
 
 See [`cli.json.example`](cli.json.example). Config changes reload automatically; use `/reload` if needed. Open a session, then run `/cache-stats`.
+
+The sidebar indicator is enabled by default and uses assistant-only totals for the selected session and descendants. To disable it, use an options entry in `cli.json`:
+
+```json
+{
+  "plugins": [{ "package": "./plugins/cache-stats", "options": { "sidebar": false } }]
+}
+```
 
 ## Development
 

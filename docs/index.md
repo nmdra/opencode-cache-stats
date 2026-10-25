@@ -14,7 +14,7 @@ hit = cache read / (input + cache read)
 
 The rate uses the token counts of the session. The counts come from the messages of the session and its subagents. Cache write is a one-time priming cost, so it is not part of the rate.
 
-Only assistant steps with recorded usage count as requests. Compaction and auxiliary calls are excluded. All message pages are read, including pre-compaction history. Reopen the dialog to refresh the snapshot.
+Only assistant steps with recorded usage count as requests. Compaction is reported separately and other auxiliary calls are excluded. All pages are read, including pre-compaction history. The V2 version adds live refresh, All/Main/Subagents filters, a recent-request trend, a sidebar indicator, and Markdown/JSON clipboard reports.
 
 The plugin shows a verdict word and a color for the rate. The word is `Excellent` at 90% or more. The word is `Good` at 70% to 89%. The word is `Fair` at 40% to 69%. The word is `Poor` below 40%. The mapping is in `docs/colors.md`.
 

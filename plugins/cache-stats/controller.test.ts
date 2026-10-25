@@ -9,6 +9,7 @@ function harness(api = client()) {
   let layer: ReturnType<Parameters<Plugin.Context["keymap"]["layer"]>[0]> | undefined;
   let shown = 0;
   let cleared = 0;
+  let presentation: Parameters<Plugin.Context["ui"]["dialog"]["set"]>[0] = { size: "medium", centered: false };
   let closed: (() => void) | undefined;
   const toasts: Parameters<Plugin.Context["ui"]["toast"]["show"]>[0][] = [];
   const context: CacheContext = {
@@ -17,12 +18,22 @@ function harness(api = client()) {
     ui: {
       router: { current: () => route },
       toast: { show: (options) => { toasts.push(options); } },
-      dialog: { set() {}, show(_render, onClose) { shown++; closed = onClose; }, clear() { cleared++; } },
+      dialog: {
+        set(options) { presentation = options; },
+        show(_render, onClose) {
+          // Match the host: showing a new dialog resets its presentation.
+          presentation = { size: "medium", centered: false };
+          shown++;
+          closed = onClose;
+        },
+        clear() { cleared++; },
+      },
     },
   };
   const controller = setupCacheStats(context, () => undefined);
   return {
     controller, toasts, layer: () => layer, shown: () => shown, cleared: () => cleared,
+    presentation: () => presentation,
     navigate(next: typeof route) { route = next; }, close() { closed?.(); },
   };
 }
@@ -43,6 +54,12 @@ test("warns outside a session", async () => {
   await app.controller.run();
   assert.equal(app.toasts[0].message, "No active session.");
   assert.equal(app.shown(), 0);
+});
+
+test("applies centered presentation after opening resets the dialog options", async () => {
+  const app = harness();
+  await app.controller.run();
+  assert.deepEqual(app.presentation(), { size: "medium", centered: true });
 });
 
 test("reports server failures without showing zero or partial totals", async () => {

@@ -30,8 +30,9 @@ export function setupCacheStats(context: CacheContext, render: (stats: Collected
       const stats = await collect(context.client, route.sessionID, request.signal);
       const current = context.ui.router.current();
       if (request.signal.aborted || disposed || current.type !== "session" || current.sessionID !== route.sessionID) return;
-      context.ui.dialog.set({ size: "large", centered: true });
       context.ui.dialog.show(() => render(stats), () => { dialogOpen = false; });
+      // Opening a dialog resets its presentation; apply options afterwards.
+      context.ui.dialog.set({ size: "medium", centered: true });
       dialogOpen = true;
     } catch {
       if (!request.signal.aborted && !disposed) {

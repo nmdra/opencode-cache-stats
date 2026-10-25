@@ -1,64 +1,65 @@
 # Use the plugin
 
-This guide has two parts. The first part is a procedure. It opens the dialog. The second part explains how to read the dialog.
+Open a session and run `/cache-stats`, or select **Cache stats** in the command palette (`cache-stats.show`). The centered, 60-column popup opens on **Summary** with **All** scope selected. It refreshes while open.
 
-## Run the slash command
+## Controls
 
-1. Open a session in opencode.
-2. Run the command `/cache-stats`.
+| Control | Action |
+| --- | --- |
+| Tab / Shift+Tab, or Right / Left | Next / previous view |
+| Click a view label | Open Summary, Models, Usage, or Agents |
+| `f` or click a scope | Switch All, Main, or Subagents |
+| `r` or click the status line | Refresh immediately |
+| `m` / `j` | Copy Markdown / JSON for the entire selected scope |
+| `h` or click Help | Open help / return to the previous view |
+| Up/Down, Page Up/Page Down | Scroll the active view |
+| Home / End | Jump to the first / last row |
+| Escape or click `esc` | Close |
 
-The dialog appears. It shows a snapshot of the current session and all descendants. Reopen it to refresh. You can also select **Cache stats** in the command palette (`cache-stats.show`).
+Changing a view or scope resets scrolling to the top. Live updates preserve the active view and scope. The header, scope controls, hit rate, and footer remain visible while the body scrolls. A row-range indicator appears when scrolling is needed.
 
-If the dialog shows the message `No active session.`, open a session first. Then run the command again.
+## Views
 
-## Close the dialog
+### Summary
 
-Press the key `esc`. The dialog closes. The session stays open.
+The header shows `Cache Stat | session title` on one line, trimming long titles to leave room for Help and Escape. The six main metrics—requests, models, subagents, tokens, cache reads, and cost—use two compact columns where space permits. The header bar uses green for cache hits and red for misses, with the miss percentage alongside it. Partial cells preserve small miss fractions; unavailable usage remains neutral. **Recent 25** shows up to 25 recorded assistant requests, oldest to newest. Higher glyphs mean better token cache hits; a dot means `n/a`. The window percentage is token-weighted, not an average of request percentages.
 
-## The sections of the dialog
+The summary fits without scrolling at normal terminal sizes. On narrow terminals the metrics stack and the trend displays fewer samples, with its percentage recalculated for those visible samples. Recorded compaction, when present, adds a separate cost line; full details are under Usage.
 
-The dialog has seven sections. A footer shows the color levels at the bottom.
+### Models
 
-- **The header.** This section shows the title `Cache stats`. The session title follows it. It shows the key `esc` on the right.
-- **The highlight.** This section shows the overall cache rate with a hit bar.
-- **The session summary.** This section shows the total requests, the model count, the subagent count, the total tokens, and the total cost.
-- **The models.** This section lists the models of the session. Each row shows a hit bar, the hit rate, and the total tokens of the model.
-- **The totals.** This section shows grouped totals for tokens, requests, and cost. It shows averages per request.
-- **The subagents.** This section lists the subagents of the session. Each subagent has a child row. The child row shows the model of the subagent and its tokens.
-- **The footer.** This shows the label `CH Levels` and the color levels with a dot for each level.
+Each model card shows the model name, provider, token cache-hit rate, request count, tokens, and recorded cost. Long names are truncated by terminal cell width rather than pushing numbers off-screen. Models sort by hit rate, then request count. The small progress line is omitted on narrow terminals; the numeric rate is always retained.
 
-## The overall rate
+### Usage
 
-The overall rate is the first value. The plugin computes it from all messages. It includes the messages of the subagents. A verdict word follows the rate: `Excellent`, `Good`, `Fair`, or `Poor`.
+Detailed token counts and shares are followed by cached-request counts, averages per request, and recorded USD costs. The **Share** column is a percentage of total tokens, not the cache-hit denominator. **Requests with cache reads** is also a different measure from the token cache-hit percentage in the header.
 
-A high rate means that many tokens come from the cache. A low rate means that many tokens do not come from the cache.
+Compaction counts, tokens, and cost appear separately only when compaction messages exist. Otherwise this section is omitted. Combined cost includes assistant plus recorded compaction usage, not title generation or other auxiliary calls. Accounting caveats and retry semantics are available in Help rather than repeated in the main views.
 
-## The models section
+Costs do not use an approximation marker. Small nonzero amounts retain extra precision; amounts below the display threshold show `<$0.00001` rather than a misleading zero.
 
-The models section shows one row per model. Each row has a bar. The bar shows how much of the input came from the cache. The filled cells of the bar use the color of the hit level. Next to the bar the row shows the hit rate and the total tokens of the model.
+### Agents
 
-The dialog sorts the models by cache hit rate. The model with the highest rate is first. If two models have the same rate, the model with the most requests is first.
+Each subagent card includes its name, session ID, dominant model, cache-hit rate, cached-request ratio, tokens, and cost. Rows include their own descendants and can overlap; do not add all rows to reconstruct the overall total.
 
-## The totals section
+Main scope excludes subagents. Its empty Agents view explains this and offers a **Show All scope** action. An empty session tree instead explains that subagents will appear when they run.
 
-The totals section groups the metrics. The group `Tokens` shows the fresh input, the cache read, the output, the reasoning, and the cache-write tokens. Each value has a percentage. The percentage is the share of all tokens in the session. The group `Requests` shows the total requests, the cache hits, the cache misses, and a cache-efficiency bar. The group `Cost` shows the total cost.
+## Scope and data status
 
-The group `Avg per Request` shows the averages per request. The averages are the totals divided by the number of requests.
+- **All:** the selected session and every descendant, each counted once.
+- **Main:** only the selected session, even if it is itself a subagent.
+- **Subagents:** all descendants, excluding the selected session.
 
-The totals add the values of every request in the session. The values grow as the session grows. A cache read total can be much larger than the context window. This is correct. Every request re-reads the same cached prefix. The values are not a snapshot of the current context.
+Every metric and report follows this filter. Requests mean assistant steps with recorded tokens, not individual retry attempts. Assistant totals exclude compaction; missing usage is excluded rather than treated as zero.
 
-Here a request means an assistant step with recorded token usage, not each retry attempt. Compaction, title generation, and other auxiliary calls are excluded. Missing usage is reported in a warning rather than counted as a zero-token request.
+The status line shows the last successful update time, refreshing/retrying state, or **Stale** after a failed refresh. Steps without usage remain excluded without a popup notice; Help and exported reports explain the accounting. Press **r** to retry. Empty scopes give guidance rather than showing a wall of zero values.
 
-## The subagents section
+## Sidebar and reports
 
-The subagents section shows one parent row per subagent. The row shows the agent name (falling back to its title or ID), a short ID, its cache rate, and its cache-hit ratio. A child row shows its dominant model and token and cost totals. Each subagent row includes its descendants; rows can overlap and should not be added together.
+When OpenCode's sidebar is visible, **Cache** shows All-scope assistant usage for the selected session tree. Click it to open the popup. Disable it with the plugin option `sidebar: false` in `cli.json`.
 
-The dialog sorts the subagents by cache hit rate. The subagent with the highest rate is first.
+Reports include the entire selected scope regardless of the active view. They contain session titles/IDs and usage figures, but no prompts, compaction summaries, or tool output. Copying requires terminal OSC 52 support; a success toast confirms dispatch, not terminal acceptance. A clipboard failure does not close the popup.
 
-The dialog shows all subagents. When there are many, the dialog scrolls. Use `↑` and `↓`, or Page Up and Page Down.
+## Small terminals
 
-## No data yet
-
-When the session has no assistant messages, the dialog shows a guidance message. It tells you to run at least one assistant request and then open the dialog again.
-
-When the session has messages but no token data yet, the dialog shows a different message. It tells you to wait for the session to finish streaming.
+The dialog adapts to width and height and shortens tab labels when necessary. The session title shares the header row with the plugin name and is trimmed to available space. Below 28 columns or 12 rows it asks you to resize instead of rendering an unusable layout. Escape still closes it.

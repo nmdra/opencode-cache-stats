@@ -22,6 +22,7 @@ test("collects through the published V2 client, preserving pagination and authen
         return Response.json({ data: [], cursor: {} });
       }
       if (url.pathname === "/api/session/root/message") {
+        if (url.searchParams.get("type") === "compaction") return Response.json({ data: [], cursor: {} });
         assert.equal(url.searchParams.get("type"), "assistant");
         if (!url.searchParams.has("cursor")) {
           return Response.json({ data: [assistant("msg_first")], cursor: { next: "next-page" } });
@@ -36,6 +37,6 @@ test("collects through the published V2 client, preserving pagination and authen
   const result = await collect(client, "root", new AbortController().signal);
   assert.equal(result.acc.reqs, 2);
   assert.equal(result.acc.cacheRead, 180);
-  assert.equal(requests.length, 4);
+  assert.equal(requests.length, 5);
   assert.equal(requests.find((url) => url.pathname === "/api/session")?.searchParams.get("parentID"), "root");
 });

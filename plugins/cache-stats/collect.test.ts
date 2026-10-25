@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { collect } from "./collect.ts";
-import { assistant, client, session } from "./test-helpers.ts";
+import { collect, selectScope } from "./collect.ts";
+import { assistant, client, compaction, session } from "./test-helpers.ts";
 
 const signal = () => new AbortController().signal;
 
@@ -10,6 +10,7 @@ test("reads every message page, keeps assistant filters, and includes old histor
   const result = await collect(client({
     messages: async (input, options) => {
       assert.ok(options?.signal);
+      if (input.type === "compaction") return { data: [], cursor: {} };
       assert.equal(input.type, "assistant");
       cursors.push(input.cursor);
       if (!input.cursor) {
@@ -117,4 +118,35 @@ test("does not start requests when cancelled", async () => {
   let called = false;
   await assert.rejects(collect(client({ get: async () => { called = true; return session("root"); } }), "root", abort.signal), { name: "AbortError" });
   assert.equal(called, false);
+});
+
+test("provides disjoint main/subagent scopes, trends, and paginated compaction", async () => {
+  const filters: string[] = [];
+  const result = await collect(client({
+    list: async (input) => ({ data: input?.parentID === "root" ? [session("child")] : [], cursor: {} }),
+    messages: async ({ sessionID, type, cursor }) => {
+      filters.push(`${sessionID}:${type}:${cursor ?? ""}`);
+      if (type === "compaction") {
+        return cursor ? { data: [compaction(`msg_${sessionID}_comp2`)], cursor: {} }
+          : { data: [compaction(`msg_${sessionID}_comp1`)], cursor: { next: "comp2" } };
+      }
+      return { data: [assistant(`msg_${sessionID}`, { time: { created: 1, completed: sessionID === "root" ? 2 : 3 } })], cursor: {} };
+    },
+  }), "root", signal());
+  const main = selectScope(result, "main");
+  const children = selectScope(result, "subagents");
+  assert.equal(main.acc.reqs, 1);
+  assert.equal(children.acc.reqs, 1);
+  assert.equal(selectScope(result, "all").acc.reqs, 2);
+  assert.equal(main.compaction.reqs, 2);
+  assert.equal(children.compaction.reqs, 2);
+  assert.equal(result.compaction.reqs, 4);
+  assert.equal(result.acc.cost, 0.5);
+  assert.equal(result.compaction.cost, 2);
+  assert.equal(main.perModel.get("acme/model-a")?.reqs, 1);
+  assert.equal(children.subagents, 1);
+  assert.equal(main.subs.length, 0);
+  assert.deepEqual(result.recent.map((sample) => sample.sessionID), ["root", "child"]);
+  assert.deepEqual(result.sessionIDs, ["root", "child"]);
+  assert.ok(filters.includes("child:compaction:comp2"));
 });

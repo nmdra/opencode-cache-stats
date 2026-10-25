@@ -1,4 +1,4 @@
-import type { SessionInfo, SessionMessageAssistant, TokenUsageInfo } from "@opencode/client";
+import type { SessionInfo, SessionMessageAssistant, SessionMessageCompactionCompleted, TokenUsageInfo } from "@opencode/client";
 import type { CollectionClient } from "./collect.ts";
 
 export function tokens(overrides: Partial<TokenUsageInfo> = {}): TokenUsageInfo {
@@ -11,6 +11,11 @@ export function assistant(id: string, overrides: Partial<SessionMessageAssistant
     time: { created: 1, completed: 2 }, content: [], tokens: tokens(), cost: 0.25,
     ...overrides,
   };
+}
+
+export function compaction(id: string, overrides: Partial<SessionMessageCompactionCompleted> = {}): SessionMessageCompactionCompleted {
+  return { id, type: "compaction", status: "completed", reason: "manual", summary: "private summary",
+    time: { created: 3 }, tokens: tokens(), cost: 0.5, ...overrides };
 }
 
 export function session(id: string, overrides: Partial<SessionInfo> = {}): SessionInfo {
@@ -33,7 +38,7 @@ export function client(overrides: {
       list: overrides.list ?? (async () => ({ data: [], cursor: {} })),
     },
     message: {
-      list: overrides.messages ?? (async () => ({ data: [assistant("msg_one")], cursor: {} })),
+      list: overrides.messages ?? (async ({ type }) => ({ data: type === "compaction" ? [] : [assistant("msg_one")], cursor: {} })),
     },
   };
 }
