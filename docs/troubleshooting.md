@@ -1,49 +1,37 @@
 # Troubleshooting
 
-Read the error first. Then read the fix. The fixes are one instruction per step.
+## The command is missing or the dialog does not appear
 
-## The command does nothing
+- Check `opencode --version`. This branch targets V2 **2.1.4**; V1 users need the [`v1` branch](https://github.com/nmdra/opencode-cache-stats/tree/v1).
+- Copy the complete plugin directory, including `package.json` and all runtime modules.
+- Check the `plugins` entry in the global `cli.json`. It must name a directory, such as `./plugins/cache-stats`, not a TSX file.
+- Use `/reload`, then try `/cache-stats` inside a session. Config changes normally reload automatically.
+- Check OpenCode's plugin diagnostics and `~/.local/share/opencode/log/opencode.log` for loading errors. Redact credentials and session contents before sharing logs.
 
-The slash command `/cache-stats` does nothing when you are not in a session.
+## The dialog shows “No active session.”
 
-Open a session first. Then run the command again.
+Open a session first. The plugin measures the session currently shown in the terminal.
 
-## The dialog shows `No active session.`
+## The plugin cannot read complete statistics
 
-The plugin cannot find a session. This message appears when the command runs outside a session.
+Check the connected server and try again. With a remote server, check its connection rather than the local database. A failed metadata, message, or child-session request prevents the dialog from opening. The plugin intentionally does not replace missing history with cached TUI data.
 
-Open a session. Then run `/cache-stats` again.
+## There is no rate, or assistant steps lack usage
 
-Make sure that you are on the session page. A session page has the session id in the route.
+`n/a` means fresh input plus cache reads is zero. An empty session has no statistics. While streaming, usage may not be recorded yet; reopen after the step finishes. Failed steps may never receive usage, and the dialog warns when it excludes them.
 
-## The dialog does not appear
+## Numbers differ from OpenCode's session totals
 
-The plugin loads at opencode startup. If the plugin was not installed before the start, it does not load.
+This dialog counts recorded assistant steps and excludes compaction, title generation, and other auxiliary model calls. Its request count does not count every retry attempt. See [usage scope](how-it-works.md#usage-scope).
 
-Restart opencode. Then run `/cache-stats` again.
+The models list and overall totals both include the active session and all descendants. Each subagent row includes its descendants too, so subagent rows can overlap. Do not add overlapping rows together.
 
-Make sure that the path in `tui.json` is correct. The path must point to `cache-stats.tsx`.
+The dialog is a snapshot. Reopen it after concurrent work finishes to obtain a newer reading.
 
-## The dialog shows `n/a`
+## The dialog is long or the terminal is narrow
 
-The plugin shows `n/a` when the rate has no value. This happens when the sum of the token values is zero.
+Use Up/Down or Page Up/Page Down to scroll, and Escape to close. Long names are shortened. Widen the terminal if fixed-width model or subagent rows are clipped.
 
-Do a session with an AI model. Then run `/cache-stats` again. A session before the first reply gives no rate.
+## Colors look different
 
-## The dialog shows wrong numbers
-
-The plugin reads the data from the session. It reads from the API first. If the API fails, it reads from the local state. The two reads have different numbers.
-
-Run the command again after the reply finishes. A reply that still runs gives partial numbers.
-
-## The total is different from the models
-
-The plugin adds the subagents into the total. The models list shows the main session only. The difference is the subagent contribution.
-
-This is expected. The totals include everything. The models list does not.
-
-## No color on the rate
-
-The colors come from the opencode theme. If the theme has no color map, the plugin shows the text color.
-
-Set the opencode theme to a default theme. Log out, then log back in. The dialog uses the theme on the next run.
+Colors come from V2's semantic theme tokens. Change the terminal theme using OpenCode's settings. The dialog follows the active theme; no logout or service restart is required.

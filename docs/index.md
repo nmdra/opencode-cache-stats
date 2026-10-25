@@ -1,6 +1,6 @@
 # cache-stats
 
-cache-stats is an opencode TUI plugin. It shows the cache rate of a session. It opens a dialog when you run the slash command `/cache-stats`. It does not invoke an AI model.
+cache-stats is an OpenCode V2 CLI/TUI plugin, targeting version 2.1.4. It shows the cache rate of a session. It opens a dialog when you run `/cache-stats` and does not invoke a model. OpenCode V1 users should use the [`v1` branch](https://github.com/nmdra/opencode-cache-stats/tree/v1).
 
 You use it to see how much of the prompt input comes from the cache. A high rate means a lower cost for the session.
 
@@ -13,6 +13,8 @@ hit = cache read / (input + cache read)
 ```
 
 The rate uses the token counts of the session. The counts come from the messages of the session and its subagents. Cache write is a one-time priming cost, so it is not part of the rate.
+
+Only assistant steps with recorded usage count as requests. Compaction and auxiliary calls are excluded. All message pages are read, including pre-compaction history. Reopen the dialog to refresh the snapshot.
 
 The plugin shows a verdict word and a color for the rate. The word is `Excellent` at 90% or more. The word is `Good` at 70% to 89%. The word is `Fair` at 40% to 69%. The word is `Poor` below 40%. The mapping is in `docs/colors.md`.
 

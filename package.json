@@ -1,0 +1,25 @@
+{
+  "name": "opencode-cache-stats-workspace",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.4.0"
+  },
+  "workspaces": ["plugins/cache-stats"],
+  "scripts": {
+    "test": "tsx --test plugins/cache-stats/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@opencode/theme": "2.1.4",
+    "@opentui/core": "0.6.8",
+    "@opentui/solid": "0.6.8",
+    "@types/node": "^24.0.0",
+    "solid-js": "^1.9.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "overrides": {
+    "seroval": "^1.7.2"
+  }
+}

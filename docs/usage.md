@@ -7,7 +7,7 @@ This guide has two parts. The first part is a procedure. It opens the dialog. Th
 1. Open a session in opencode.
 2. Run the command `/cache-stats`.
 
-The dialog appears. It shows the cache rate of the current session.
+The dialog appears. It shows a snapshot of the current session and all descendants. Reopen it to refresh. You can also select **Cache stats** in the command palette (`cache-stats.show`).
 
 If the dialog shows the message `No active session.`, open a session first. Then run the command again.
 
@@ -47,13 +47,15 @@ The group `Avg per Request` shows the averages per request. The averages are the
 
 The totals add the values of every request in the session. The values grow as the session grows. A cache read total can be much larger than the context window. This is correct. Every request re-reads the same cached prefix. The values are not a snapshot of the current context.
 
+Here a request means an assistant step with recorded token usage, not each retry attempt. Compaction, title generation, and other auxiliary calls are excluded. Missing usage is reported in a warning rather than counted as a zero-token request.
+
 ## The subagents section
 
-The subagents section shows one parent row per subagent. The row shows the subagent name, a short id, its cache rate, and its cache-hit ratio. A child row below shows the model of the subagent and its total tokens. The model is the model with the most requests. The child row has a muted color.
+The subagents section shows one parent row per subagent. The row shows the agent name (falling back to its title or ID), a short ID, its cache rate, and its cache-hit ratio. A child row shows its dominant model and token and cost totals. Each subagent row includes its descendants; rows can overlap and should not be added together.
 
 The dialog sorts the subagents by cache hit rate. The subagent with the highest rate is first.
 
-The dialog shows all subagents. When there are many, the dialog scrolls. Use the `↑` and `↓` keys to scroll.
+The dialog shows all subagents. When there are many, the dialog scrolls. Use `↑` and `↓`, or Page Up and Page Down.
 
 ## No data yet
 

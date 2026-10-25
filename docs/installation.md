@@ -1,82 +1,39 @@
-# Install the plugin
+# Install the V2 plugin
 
-This guide is for Linux. The path for the opencode configuration is `~/.config/opencode`.
+This branch targets OpenCode **2.1.4**. OpenCode V1 users should use the [`v1` branch](https://github.com/nmdra/opencode-cache-stats/tree/v1), which retains the original single-file plugin and installation instructions.
 
-## 1. Find the configuration folder
+## 1. Copy the plugin directory
 
-1. Open a terminal.
-2. Run the command `echo $HOME` to find your home folder.
+From this repository's root, on Linux:
 
-The configuration folder is `$HOME/.config/opencode`.
-
-## 2. Copy the plugin file
-
-1. Go to the configuration folder.
-
-Run the command:
-
-```
-cd ~/.config/opencode
+```sh
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+mkdir -p "$config_dir/plugins/cache-stats"
+cp plugins/cache-stats/{package.json,tui.tsx,view.tsx,controller.ts,collect.ts,stats.ts} \
+  "$config_dir/plugins/cache-stats/"
 ```
 
-2. Create the folder `tui-plugins`.
+Keep all six files together. V2 loads plugin directories, not a configured path to an individual TSX file. OpenCode supplies the plugin and OpenTUI runtime imports; you do not need to run npm install in the copied directory.
 
-Run the command:
+## 2. Enable the CLI plugin
 
-```
-mkdir -p tui-plugins
-```
-
-3. Copy the file `cache-stats.tsx` from this repository into `tui-plugins`.
-
-```
-cp tui-plugins/cache-stats.tsx ~/.config/opencode/tui-plugins/cache-stats.tsx
-```
-
-4. Make sure that the file exists.
-
-Run the command:
-
-```
-ls ~/.config/opencode/tui-plugins/
-```
-
-The file `cache-stats.tsx` appears in the list.
-
-## 3. Register the plugin
-
-The file `tui.json` in the config folder lists the TUI plugins. This plugin must be on that list.
-
-1. Open the file `tui.json` with a text editor.
-
-```
-code ~/.config/opencode/tui.json
-```
-
-If the file does not exist, create a new file with this name.
-
-2. Add the path `"./tui-plugins/cache-stats.tsx"` to the list of plugins.
-
-Use the example file `tui.json.example` in this repository as a starting point. The registration looks like this:
+Edit the global `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`). Preserve existing settings and plugin entries:
 
 ```json
 {
-  "plugin": ["./tui-plugins/cache-stats.tsx"]
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["./plugins/cache-stats"]
 }
 ```
 
-3. Save the file, then close the editor.
+See `cli.json.example`. The global `plugins/` directory is also discovered automatically. Do not register this terminal-only plugin in `opencode.json` or in the old `tui.json`.
 
-## 4. Restart opencode
+V2 CLI configuration is global; there is no project-local `cli.json`. Because this is a CLI-only plugin, it remains available when your terminal connects to a remote server.
 
-1. Close the opencode program.
-2. Start the opencode program again.
+## 3. Load and test
 
-The plugin loads when opencode starts.
+Configuration changes reload automatically. Use `/reload` if necessary, then open a session and run `/cache-stats`. The command is also available in the palette as **Cache stats** (`cache-stats.show`).
 
-## 5. Test the plugin
+If replacing an old installation, remove its `tui.json` registration and old `tui-plugins/cache-stats.tsx` only after confirming you no longer need them for V1. V1 code itself does not run in V2.
 
-1. Open a session.
-2. Run the command `/cache-stats`.
-
-If the dialog appears, the plugin works. If it does not appear, read `docs/troubleshooting.md`.
+See [troubleshooting](troubleshooting.md) if the dialog does not appear.

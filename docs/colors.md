@@ -38,4 +38,4 @@ The footer repeats the color levels with a dot for each level: `● ≥90%` in t
 
 ## The theme
 
-The colors depend on the opencode theme. A dark theme and a light theme give different colors. You can change the theme in opencode. The plugin uses the new theme on the next run.
+The colors use OpenCode V2's semantic theme tokens: `text.feedback.success`, `info`, `warning`, and `error`, plus `text.muted`, `border.base`, and `syntax.number`. Dark and light themes can give different colors. You can change the theme in OpenCode; the dialog follows the active theme.

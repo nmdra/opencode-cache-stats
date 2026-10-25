@@ -1,8 +1,12 @@
 # /cache-stats
 
-/cache-stats is a lightweight TUI plugin for opencode that displays the active session's cache statistics in a popup dialog. It provides the overall cache hit rate, a breakdown by model and subagent, and the associated costs, making it easy to understand cache performance at a glance.
+/cache-stats is a lightweight CLI/TUI plugin for **OpenCode V2**. It displays the active session's cache statistics in a popup dialog, with a breakdown by model and subagent, token totals, and recorded costs.
+
+This branch targets OpenCode **2.1.4**. For OpenCode V1, use the [`v1` branch](https://github.com/nmdra/opencode-cache-stats/tree/v1).
 
 > Run the `/cache-stats` command (or the `cache-stats.show` command) inside a session to open the dialog.
+
+The screenshots below show the previous V1 layout; V2 keeps the same sections.
 
 | Summary and models | Totals breakdown | Subagents |
 |:---:|:---:|:---:|
@@ -26,21 +30,42 @@ hit = cache read / (input + cache read)
 
 A cache write is a one-time priming cost. It is excluded from the hit ratio. The plugin also reports the number of API requests that read from the cache.
 
+Requests mean assistant steps with recorded usage, not individual retry attempts. Totals include the active session and all descendants, including history before compaction. Compaction, title generation, and other auxiliary model calls are excluded. The dialog is a snapshot; reopen it to refresh.
+
 ## Install
 
-1. Copy the plugin into `~/.config/opencode/tui-plugins/`.
-2. Register the plugin in `~/.config/opencode/tui.json`:
+1. Copy the V2 plugin directory (not a single TSX file):
+
+```sh
+mkdir -p ~/.config/opencode/plugins/cache-stats
+cp plugins/cache-stats/{package.json,tui.tsx,view.tsx,controller.ts,collect.ts,stats.ts} \
+  ~/.config/opencode/plugins/cache-stats/
+```
+
+2. Add it to `plugins` in the global `~/.config/opencode/cli.json`, preserving other settings:
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["./tui-plugins/cache-stats.tsx"]
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["./plugins/cache-stats"]
 }
 ```
 
-The repo keeps a copy of `tui.json` as `tui.json.example`.
+Use `$XDG_CONFIG_HOME/opencode` instead when `XDG_CONFIG_HOME` is set. OpenCode also discovers this global plugin directory automatically; the explicit entry makes enablement clear. No server plugin or npm installation is needed for this local install.
 
-After you change `tui.json`, restart [opencode](https://opencode.ai). Then run the `/cache-stats` command inside a session.
+See [`cli.json.example`](cli.json.example). Config changes reload automatically; use `/reload` if needed. Open a session, then run `/cache-stats`.
+
+## Development
+
+Use Node.js 26.4 or newer (required by the OpenTUI development dependencies).
+
+```sh
+npm ci
+npm test
+npm run typecheck
+```
+
+The plugin uses the terminal's connected client, including with remote servers. It does not read the local OpenCode database or start a separate service.
 
 ## Documentation
 
@@ -50,3 +75,4 @@ After you change `tui.json`, restart [opencode](https://opencode.ai). Then run t
 - [how-it-works](docs/how-it-works.md) — how the plugin collects the data
 - [colors](docs/colors.md) — how the plugin colors the rate
 - [troubleshooting](docs/troubleshooting.md) — how to fix common errors
+- [V2 API references](docs/how-it-works.md#references) — official documentation and the targeted client contract
