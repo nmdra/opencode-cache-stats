@@ -1,10 +1,10 @@
 # Install the V2 plugin
 
-This branch targets OpenCode **2.1.4**. OpenCode V1 users should use the [`v1` branch](https://github.com/nmdra/opencode-cache-stats/tree/v1), which retains the original single-file plugin and installation instructions.
+This branch targets OpenCode **2.1.4**. For OpenCode V1, use the [`v1` branch](https://github.com/nmdra/opencode-cache-stats/tree/v1). That branch contains the original single-file plugin and its installation instructions.
 
 ## 1. Copy the plugin directory
 
-From this repository's root, on Linux:
+On Linux, run these commands from the root of this repository:
 
 ```sh
 config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
@@ -13,11 +13,11 @@ cp plugins/cache-stats/{package.json,tui.tsx,view.tsx,presentation.ts,controller
   "$config_dir/plugins/cache-stats/"
 ```
 
-Keep all ten files together. V2 loads plugin directories, not a configured path to an individual TSX file. OpenCode supplies the plugin and OpenTUI runtime imports; you do not need to run npm install in the copied directory.
+Keep all ten files together. V2 loads plugin directories. It does not load a configured path to an individual TSX file. OpenCode supplies the plugin and OpenTUI runtime imports. You do not need to run npm install in the copied directory.
 
 ## 2. Enable the CLI plugin
 
-Edit the global `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`). Preserve existing settings and plugin entries:
+Edit the global `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`). Keep the existing settings and plugin entries:
 
 ```json
 {
@@ -26,16 +26,16 @@ Edit the global `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli
 }
 ```
 
-See `cli.json.example`. The global `plugins/` directory is also discovered automatically. Do not register this terminal-only plugin in `opencode.json` or in the old `tui.json`.
+See `cli.json.example`. OpenCode also finds the global `plugins/` directory automatically. Do not register this terminal-only plugin in `opencode.json` or in the old `tui.json`.
 
-V2 CLI configuration is global; there is no project-local `cli.json`. Because this is a CLI-only plugin, it remains available when your terminal connects to a remote server.
+V2 CLI configuration is global. There is no project-local `cli.json`. This CLI-only plugin remains available when your terminal connects to a remote server.
 
-The sidebar indicator is enabled by default. Disable it with `{"package":"./plugins/cache-stats","options":{"sidebar":false}}` in the `plugins` array. It does not force OpenCode's sidebar to become visible.
+The sidebar indicator is enabled by default. To disable the indicator, use `{"package":"./plugins/cache-stats","options":{"sidebar":false}}` in the `plugins` array. The indicator does not force OpenCode's sidebar to become visible.
 
 ## 3. Load and test
 
-Configuration changes reload automatically. Use `/reload` if necessary, then open a session and run `/cache-stats`. The command is also available in the palette as **Cache stats** (`cache-stats.show`).
+Configuration changes reload automatically. If necessary, use `/reload`. Open a session. Then run `/cache-stats`. You can also select **Cache stats** in the command palette (`cache-stats.show`).
 
-If replacing an old installation, remove its `tui.json` registration and old `tui-plugins/cache-stats.tsx` only after confirming you no longer need them for V1. V1 code itself does not run in V2.
+If you replace an old installation, first confirm that you no longer need its files or registration for V1. Only then remove the old `tui.json` registration and `tui-plugins/cache-stats.tsx`. V1 code does not run in V2.
 
 See [troubleshooting](troubleshooting.md) if the dialog does not appear.
